@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'">
+<title>Player Overlay</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #161210;
+    color: #c9b08a;
+    font-family: 'IM Fell English', Georgia, serif;
+    font-size: 13px;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid #4a3c28;
+  }
+
+  /* ── Panel header ── */
+  .panel-hdr {
+    background: linear-gradient(to right, #8c1a1a, #4a0c0c);
+    border-bottom: 1px solid #c8922a;
+    padding: 5px 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .panel-hdr.neutral {
+    background: linear-gradient(to right, #1e1810, #161210);
+  }
+  .panel-title {
+    font-family: 'Cinzel', serif;
+    font-size: 11px;
+    font-weight: 600;
+    color: #e8b84a;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    flex: 1;
+  }
+  .gem {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #cc2a2a;
+    border: 1px solid #c8922a;
+    flex-shrink: 0;
+  }
+  .gem.gold { background: #c8922a; border-color: #e8b84a; }
+  .pip {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #2a7a2a;
+    flex-shrink: 0;
+  }
+  .pip.offline { background: #555; }
+
+  /* ── Divider ── */
+  .divider {
+    height: 1px;
+    background: linear-gradient(to right, transparent, #6b5535, #4a3c28, #6b5535, transparent);
+    flex-shrink: 0;
+  }
+
+  /* ── Scroll body ── */
+  .scroll-body {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+  }
+  .scroll-body::-webkit-scrollbar { width: 3px; }
+  .scroll-body::-webkit-scrollbar-track { background: transparent; }
+  .scroll-body::-webkit-scrollbar-thumb { background: #4a3c28; border-radius: 2px; }
+
+  /* ── Roll entry ── */
+  .roll-entry {
+    display: grid;
+    grid-template-columns: 34px 1fr auto;
+    align-items: start;
+    gap: 7px;
+    padding: 5px 10px;
+    border-bottom: 1px solid rgba(74,60,40,0.25);
+    cursor: default;
+    transition: background 0.1s;
+  }
+  .roll-entry:hover { background: rgba(200,146,42,0.04); }
+  .roll-entry.ignored { opacity: 0.32; }
+
+  .dice-face {
+    width: 32px; height: 32px;
+    background: #1e1916;
+    border: 1px solid #4a3c28;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    color: #a08060;
+    flex-shrink: 0;
+  }
+  .dice-face.crit { border-color: #ffd100; background: rgba(255,209,0,0.07); color: #ffd100; }
+  .dice-face.nat1 { border-color: #cc2a2a; background: rgba(140,26,26,0.13); color: #cc2a2a; }
+
+  .roll-info { min-width: 0; }
+  .roll-action {
+    font-size: 12px; color: #e8dcc8; line-height: 1.2;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .roll-action.crit { color: #ffd100; }
+  .roll-action.nat1 { color: #cc2a2a; }
+  .roll-char { font-size: 10px; color: #705a3a; margin-top: 1px; }
+  .roll-breakdown { font-size: 10px; color: #4a3820; margin-top: 1px; font-family: monospace; }
+  .roll-time {
+    font-size: 10px; color: #4a3820; margin-top: 1px;
+    font-family: 'Courier New', monospace; letter-spacing: 0.02em;
+  }
+
+  .roll-meta { text-align: right; flex-shrink: 0; }
+  .roll-num {
+    font-family: 'Cinzel', serif; font-size: 20px; font-weight: 700;
+    color: #c9b08a; line-height: 1;
+  }
+  .roll-num.crit { color: #ffd100; }
+  .roll-num.nat1 { color: #cc2a2a; }
+
+  .roll-badge {
+    display: inline-block;
+    font-family: 'Cinzel', serif; font-size: 8px;
+    letter-spacing: 0.06em; padding: 1px 4px; border: 1px solid;
+    margin-top: 2px;
+  }
+  .roll-badge.crit { color: #ffd100; border-color: rgba(255,209,0,0.4); background: rgba(255,209,0,0.06); }
+  .roll-badge.nat1 { color: #cc2a2a; border-color: rgba(204,42,42,0.4); background: rgba(140,26,26,0.10); }
+  .roll-badge.src  { color: #705a3a; border-color: rgba(74,60,40,0.35); font-size: 7px; }
+
+  .empty-state {
+    padding: 20px 12px;
+    text-align: center;
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    color: #4a3820;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* ── Initiative tracker ── */
+  .init-row {
+    display: grid;
+    grid-template-columns: 28px 1fr auto;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 10px;
+    border-bottom: 1px solid rgba(74,60,40,0.25);
+    cursor: default;
+    transition: background 0.1s;
+  }
+  .init-row:hover { background: rgba(200,146,42,0.04); }
+  .init-row.active-turn {
+    background: rgba(140,26,26,0.10);
+    border-left: 2px solid #cc2a2a;
+  }
+  .init-num {
+    font-family: 'Cinzel', serif; font-size: 16px; font-weight: 600;
+    color: #c8922a; text-align: center;
+  }
+  .init-name { font-size: 12px; color: #e8dcc8; }
+  .init-type { font-size: 10px; color: #705a3a; margin-top: 1px; }
+
+  .hp-wrap { width: 56px; }
+  .hp-label { font-size: 9px; color: #705a3a; text-align: right; margin-bottom: 2px; font-family: monospace; }
+  .hp-track { height: 3px; background: #1e1916; border: 1px solid #4a3c28; }
+  .hp-fill  { height: 100%; transition: width 0.3s; }
+  .hp-full  { background: #2a7a2a; }
+  .hp-mid   { background: #b07820; }
+  .hp-low   { background: #8c1a1a; }
+
+  .init-empty {
+    padding: 14px 12px;
+    text-align: center;
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    color: #4a3820;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* ── Status bar ── */
+  #status-bar {
+    padding: 4px 10px;
+    background: #0d0b08;
+    border-top: 1px solid rgba(74,60,40,0.3);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .status-text {
+    font-family: 'Cinzel', serif;
+    font-size: 9px;
+    color: #705a3a;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    flex: 1;
+  }
+  .status-name {
+    font-family: 'Cinzel', serif;
+    font-size: 9px;
+    color: #c8922a;
+    letter-spacing: 0.06em;
+  }
+</style>
+</head>
+<body>
+
+<!-- Roll Log panel -->
+<div class="panel-hdr">
+  <div class="gem"></div>
+  <span class="panel-title">Roll Chronicle</span>
+  <div class="pip" id="ddb-pip" title="D&D Beyond connection"></div>
+</div>
+
+<div class="scroll-body" id="roll-log" style="flex: 1.2;">
+  <div class="empty-state" id="roll-empty">Awaiting first roll...</div>
+</div>
+
+<div class="divider"></div>
+
+<!-- Initiative tracker panel -->
+<div class="panel-hdr neutral">
+  <div class="gem gold"></div>
+  <span class="panel-title">Initiative</span>
+  <span style="font-family:'Cinzel',serif;font-size:9px;color:#705a3a;letter-spacing:0.06em;">Read-only</span>
+</div>
+
+<div class="scroll-body" id="init-list" style="flex: 0.8; max-height: 220px;">
+  <div class="init-empty" id="init-empty">No combat active</div>
+</div>
+
+<!-- Status bar -->
+<div id="status-bar">
+  <div class="pip" id="relay-pip" title="Relay connection"></div>
+  <span class="status-text" id="status-text">Local session</span>
+  <span class="status-name" id="status-name"></span>
+</div>
+
+<script>
+  // ── IPC bridge ──────────────────────────────────────────────
+  const api = window.electronAPI;
+
+  // ── State ───────────────────────────────────────────────────
+  let rollCount = 0;
+
+  // ── Timestamp formatter (Phase 9) ───────────────────────────
+  function formatTime(unixMs) {
+    if (!unixMs) return '--:--:--';
+    const d  = new Date(unixMs);
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    const ss = String(d.getSeconds()).padStart(2, '0');
+    return `${hh}:${mm}:${ss}`;
+  }
+
+  function esc(s) {
+    if (!s) return '';
+    return String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // ── Render one roll entry ────────────────────────────────────
+  function renderRoll(roll) {
+    const isCrit = Boolean(roll.is_crit);
+    const isNat1 = Boolean(roll.is_nat1);
+    const isR20  = roll.source === 'r20';
+
+    const diceClass = `dice-face${isCrit ? ' crit' : isNat1 ? ' nat1' : ''}`;
+    const numClass  = `roll-num${isCrit ? ' crit' : isNat1 ? ' nat1' : ''}`;
+    const actClass  = `roll-action${isCrit ? ' crit' : isNat1 ? ' nat1' : ''}`;
+
+    let mod = '';
+    if (roll.modifier > 0)      mod = ` + ${roll.modifier}`;
+    else if (roll.modifier < 0) mod = ` - ${Math.abs(roll.modifier)}`;
+    const breakdown = `${roll.raw_result} (${roll.dice_type})${mod}`;
+
+    let badge = '';
+    if (isCrit)      badge = '<span class="roll-badge crit">Crit</span>';
+    else if (isNat1) badge = '<span class="roll-badge nat1">Nat 1</span>';
+    else if (isR20)  badge = '<span class="roll-badge src">R20 · skip</span>';
+    else             badge = '<span class="roll-badge src">DDB</span>';
+
+    const charDisplay = esc(roll.character_name || roll.player_name || 'You');
+    const timestamp   = formatTime(roll.rolled_at);
+    const label       = esc(roll.action_label || roll.roll_type || 'Roll');
+
+    const div = document.createElement('div');
+    div.className = `roll-entry${isR20 ? ' ignored' : ''}`;
+    div.innerHTML = `
+      <div class="${diceClass}">${esc(roll.dice_type)}</div>
+      <div class="roll-info">
+        <div class="${actClass}">${label}</div>
+        <div class="roll-char">${charDisplay}</div>
+        <div class="roll-breakdown">${esc(breakdown)}</div>
+        <div class="roll-time">${timestamp}</div>
+      </div>
+      <div class="roll-meta">
+        <div class="${numClass}">${roll.total}</div>
+        ${badge}
+      </div>
+    `;
+    return div;
+  }
+
+  // ── Prepend roll to log ──────────────────────────────────────
+  function addRoll(roll) {
+    const log   = document.getElementById('roll-log');
+    const empty = document.getElementById('roll-empty');
+    if (empty) empty.remove();
+
+    const entry = renderRoll(roll);
+    log.prepend(entry);
+    rollCount++;
+
+    // Trim to 100 entries
+    const all = log.querySelectorAll('.roll-entry');
+    if (all.length > 100) all[all.length - 1].remove();
+  }
+
+  // ── Render initiative list ───────────────────────────────────
+  function renderInitiative(list) {
+    const container = document.getElementById('init-list');
+    const empty     = document.getElementById('init-empty');
+
+    if (!Array.isArray(list) || list.length === 0) {
+      container.innerHTML = '';
+      container.innerHTML = '<div class="init-empty" id="init-empty">No combat active</div>';
+      return;
+    }
+
+    container.innerHTML = '';
+    for (const row of list) {
+      const pct  = row.hp_max > 0 ? Math.round((row.hp_current / row.hp_max) * 100) : 0;
+      const hpCl = pct > 66 ? 'hp-full' : pct > 33 ? 'hp-mid' : 'hp-low';
+
+      const div = document.createElement('div');
+      div.className = `init-row${row.is_active_turn ? ' active-turn' : ''}`;
+      div.innerHTML = `
+        <div class="init-num">${row.initiative_score}</div>
+        <div>
+          <div class="init-name">${esc(row.combatant_name)}</div>
+          <div class="init-type">${esc(row.combatant_type)}</div>
+        </div>
+        <div class="hp-wrap">
+          <div class="hp-label">${row.hp_current}/${row.hp_max}</div>
+          <div class="hp-track">
+            <div class="hp-fill ${hpCl}" style="width:${pct}%"></div>
+          </div>
+        </div>
+      `;
+      container.appendChild(div);
+    }
+  }
+
+  // ── Load history on init ─────────────────────────────────────
+  async function loadHistory() {
+    try {
+      const rolls = await api.invoke('rolls:get', { dmMode: false });
+      if (Array.isArray(rolls) && rolls.length > 0) {
+        const log   = document.getElementById('roll-log');
+        const empty = document.getElementById('roll-empty');
+        if (empty) empty.remove();
+        for (const roll of rolls) {
+          const entry = renderRoll(roll);
+          log.appendChild(entry);
+        }
+        rollCount = rolls.length;
+      }
+    } catch (e) {
+      console.error('[overlay-player] loadHistory:', e);
+    }
+  }
+
+  async function loadInitiative() {
+    try {
+      const list = await api.invoke('initiative:get');
+      renderInitiative(list);
+    } catch (e) {
+      console.error('[overlay-player] loadInitiative:', e);
+    }
+  }
+
+  // ── IPC listeners ────────────────────────────────────────────
+  api.on('roll:display', (roll) => {
+    addRoll(roll);
+    // Flash DDB pip briefly
+    const pip = document.getElementById('ddb-pip');
+    pip.style.background = '#ffd100';
+    setTimeout(() => { pip.style.background = '#2a7a2a'; }, 400);
+  });
+
+  api.on('initiative:sync', (list) => {
+    renderInitiative(list);
+  });
+
+  api.on('hp:update', () => {
+    loadInitiative();
+  });
+
+  // ── Boot ─────────────────────────────────────────────────────
+  window.addEventListener('DOMContentLoaded', () => {
+    loadHistory();
+    loadInitiative();
+
+    // Set status bar name from session if available
+    // (populated by main.js when views are created)
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,277 @@
+'use strict';
+
+const { app, BrowserWindow, BrowserView, ipcMain } = require('electron');
+const path = require('path');
+const { openCampaignDb, openBestiaryDb, getStatements } = require('./db/db-init');
+
+// ─────────────────────────────────────────────────────────────
+// State
+// ─────────────────────────────────────────────────────────────
+let mainWindow    = null; // BrowserWindow — shell + role picker
+let campaignDb    = null;
+let bestiaryDb    = null;
+let db            = null;
+let activeSession = null;
+let appRole       = null;
+
+// BrowserView references (Electron 29 API for embedded panels)
+let ddbView     = null;
+let roll20View  = null;
+let discordView = null;
+let overlayView = null;
+
+const HEADER_H  = 34;
+const DISCORD_H = 160;
+const SIDEBAR_W = 260;
+let discordStripH = DISCORD_H;
+
+// ─────────────────────────────────────────────────────────────
+// App ready
+// ─────────────────────────────────────────────────────────────
+app.whenReady().then(() => {
+  campaignDb = openCampaignDb(app);
+  bestiaryDb = openBestiaryDb();
+  db         = getStatements(campaignDb);
+  registerIpcHandlers();
+  createMainWindow();
+});
+
+app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+app.on('before-quit', () => { if (campaignDb) campaignDb.close(); });
+
+// ─────────────────────────────────────────────────────────────
+// Main window
+// BrowserWindow hosts the shell HTML (role picker).
+// After role is chosen, BrowserViews are added for each panel.
+// ─────────────────────────────────────────────────────────────
+function createMainWindow() {
+  mainWindow = new BrowserWindow({
+    width: 1600, height: 960, minWidth: 1200, minHeight: 700,
+    backgroundColor: '#0d0b08',
+    titleBarStyle: 'hidden',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload-main.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  mainWindow.show();
+  mainWindow.focus();
+
+  mainWindow.on('resize', () => layoutViews());
+}
+
+// ─────────────────────────────────────────────────────────────
+// Layout — positions all BrowserViews
+// ─────────────────────────────────────────────────────────────
+function layoutViews() {
+  if (!mainWindow || !appRole) return;
+
+  const [winW, winH] = mainWindow.getContentSize();
+  const contentTop   = HEADER_H + discordStripH;
+  const contentH     = winH - contentTop;
+  const mainW        = winW - SIDEBAR_W;
+
+  if (discordView) discordView.setBounds({ x: 0, y: HEADER_H, width: winW, height: discordStripH });
+
+  if (appRole === 'player') {
+    if (ddbView)     ddbView.setBounds({ x: 0, y: contentTop, width: mainW, height: contentH });
+    if (overlayView) overlayView.setBounds({ x: mainW, y: contentTop, width: SIDEBAR_W, height: contentH });
+    if (roll20View)  roll20View.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+  } else if (appRole === 'dm') {
+    if (roll20View)  roll20View.setBounds({ x: 0, y: contentTop, width: mainW, height: contentH });
+    if (overlayView) overlayView.setBounds({ x: mainW, y: contentTop, width: SIDEBAR_W, height: contentH });
+    if (ddbView)     ddbView.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Create BrowserViews after role picker submits
+// ─────────────────────────────────────────────────────────────
+function createViews(role) {
+  // Discord strip placeholder
+  discordView = new BrowserView({
+    webPreferences: { contextIsolation: true, nodeIntegration: false },
+  });
+  mainWindow.addBrowserView(discordView);
+  discordView.webContents.loadFile(path.join(__dirname, 'renderer', 'discord-strip.html'));
+
+  // D&D Beyond
+  ddbView = new BrowserView({
+    webPreferences: {
+      preload: path.join(__dirname, 'preload-ddb.js'),
+      contextIsolation: true, nodeIntegration: false,
+    },
+  });
+  mainWindow.addBrowserView(ddbView);
+  ddbView.webContents.loadURL('https://www.dndbeyond.com');
+  ddbView.webContents.openDevTools({ mode: 'detach' });
+
+  // Roll20 (DM only)
+  roll20View = new BrowserView({
+    webPreferences: {
+      preload: role === 'dm' ? path.join(__dirname, 'preload-r20.js') : undefined,
+      contextIsolation: true, nodeIntegration: false,
+    },
+  });
+  mainWindow.addBrowserView(roll20View);
+  if (role === 'dm') roll20View.webContents.loadURL('https://app.roll20.net');
+
+  // Overlay sidebar
+  overlayView = new BrowserView({
+    webPreferences: {
+      preload: path.join(__dirname, 'preload-main.js'),
+      contextIsolation: true, nodeIntegration: false,
+    },
+  });
+  mainWindow.addBrowserView(overlayView);
+  overlayView.webContents.loadFile(
+    role === 'dm'
+      ? path.join(__dirname, 'renderer', 'overlay-dm.html')
+      : path.join(__dirname, 'renderer', 'overlay-player.html')
+  );
+
+  layoutViews();
+}
+
+// ─────────────────────────────────────────────────────────────
+// IPC handlers
+// ─────────────────────────────────────────────────────────────
+function registerIpcHandlers() {
+
+  ipcMain.handle('session:set-role', async (_, { role, characterName, playerName, sessionCode, partyLevel, partySize }) => {
+    appRole = role;
+
+    if (role === 'dm') {
+      const code = sessionCode || generateSessionCode();
+      const info = db.insertSession.run({
+        session_code: code, dm_name: playerName || 'Dungeon Master',
+        started_at: Date.now(), party_level: partyLevel || 1, party_size: partySize || 6,
+      });
+      activeSession = { id: info.lastInsertRowid, code, role: 'dm' };
+    } else {
+      const code = generateSessionCode();
+      const info = db.insertSession.run({
+        session_code: code, dm_name: 'DM',
+        started_at: Date.now(), party_level: partyLevel || 1, party_size: partySize || 6,
+      });
+      const playerInfo = campaignDb.prepare(
+        `INSERT INTO players (session_id, character_name, player_name, role, joined_at) VALUES (?, ?, ?, 'player', ?)`
+      ).run(info.lastInsertRowid, characterName || 'Hero', playerName || 'Player', Date.now());
+
+      activeSession = {
+        id: info.lastInsertRowid, player_id: playerInfo.lastInsertRowid,
+        code, role: 'player',
+        characterName: characterName || 'Hero',
+        playerName:    playerName    || 'Player',
+      };
+    }
+
+    createViews(role);
+    return { ok: true, session: activeSession };
+  });
+
+  ipcMain.on('roll:captured', (_, payload) => {
+    if (!activeSession) return;
+    const roll = {
+      session_id: activeSession.id, player_id: activeSession.player_id ?? null,
+      dice_type: payload.dice_type, raw_result: payload.raw_result,
+      modifier: payload.modifier ?? 0, total: payload.total,
+      action_label: payload.action_label ?? null, roll_type: payload.roll_type ?? 'check',
+      is_secret: payload.is_secret ? 1 : 0, is_crit: payload.is_crit ? 1 : 0,
+      is_nat1: payload.is_nat1 ? 1 : 0, source: 'ddb',
+      rolled_at: payload.rolled_at ?? Date.now(),
+    };
+    db.insertRoll.run(roll);
+    if (roll.is_secret) return;
+    if (overlayView) {
+      overlayView.webContents.send('roll:display', {
+        ...roll,
+        character_name: activeSession.characterName ?? null,
+        player_name:    activeSession.playerName    ?? null,
+      });
+    }
+    // TODO Phase 11: relaySocket?.emit('roll:broadcast', roll);
+  });
+
+  ipcMain.on('hp:update', (_, { combatant_name, hp_current }) => {
+    if (!activeSession || appRole !== 'dm') return;
+    campaignDb.prepare(`UPDATE initiative SET hp_current=? WHERE session_id=? AND combatant_name=?`)
+      .run(hp_current, activeSession.id, combatant_name);
+    overlayView?.webContents.send('hp:update', { combatant_name, hp_current });
+  });
+
+  ipcMain.handle('initiative:get', () => {
+    if (!activeSession) return [];
+    return db.getInitiative.all(activeSession.id);
+  });
+
+  ipcMain.on('initiative:set-turn', (_, { id }) => {
+    if (!activeSession || appRole !== 'dm') return;
+    db.setActiveTurn.run({ id, session_id: activeSession.id });
+    overlayView?.webContents.send('initiative:sync', db.getInitiative.all(activeSession.id));
+  });
+
+  ipcMain.handle('initiative:add-combatant', (_, combatant) => {
+    if (!activeSession || appRole !== 'dm') return { ok: false };
+    const info = db.upsertCombatant.run({ ...combatant, session_id: activeSession.id });
+    overlayView?.webContents.send('initiative:sync', db.getInitiative.all(activeSession.id));
+    return { ok: true, id: info.lastInsertRowid };
+  });
+
+  ipcMain.on('initiative:clear', () => {
+    if (!activeSession || appRole !== 'dm') return;
+    db.clearInitiative.run(activeSession.id);
+    overlayView?.webContents.send('initiative:sync', []);
+  });
+
+  ipcMain.handle('rolls:get', (_, { dmMode } = {}) => {
+    if (!activeSession) return [];
+    return dmMode ? db.getAllRollsDM.all(activeSession.id) : db.getPublicRolls.all(activeSession.id);
+  });
+
+  ipcMain.on('discord:resize', (_, { height }) => {
+    discordStripH = Math.max(60, Math.min(320, height));
+    layoutViews();
+  });
+
+  ipcMain.handle('bestiary:query', (_, { crMin, crMax, environment, type, limit }) => {
+    if (!bestiaryDb) return [];
+    let sql = `SELECT m.* FROM monsters m WHERE m.cr >= @crMin AND m.cr <= @crMax`;
+    const params = { crMin: crMin ?? 0, crMax: crMax ?? 30, limit: limit ?? 20 };
+    if (environment) { sql += ` AND m.id IN (SELECT monster_id FROM monster_environments WHERE environment=@environment)`; params.environment = environment; }
+    if (type) { sql += ` AND m.type=@type`; params.type = type; }
+    sql += ` ORDER BY RANDOM() LIMIT @limit`;
+    return bestiaryDb.prepare(sql).all(params);
+  });
+
+  ipcMain.handle('bestiary:get-monster', (_, { id }) => {
+    if (!bestiaryDb) return null;
+    const monster = bestiaryDb.prepare(`SELECT * FROM monsters WHERE id=?`).get(id);
+    if (!monster) return null;
+    monster.actions = bestiaryDb.prepare(`SELECT * FROM monster_actions WHERE monster_id=? ORDER BY action_type`).all(id);
+    monster.traits  = bestiaryDb.prepare(`SELECT * FROM monster_traits  WHERE monster_id=?`).all(id);
+    return monster;
+  });
+
+  ipcMain.handle('encounter:save', (_, encounter) => {
+    if (!activeSession || appRole !== 'dm') return { ok: false };
+    const info = db.insertEncounter.run({
+      session_id: activeSession.id, encounter_json: JSON.stringify(encounter.monsters),
+      difficulty: encounter.difficulty, xp_total: encounter.xp_total, generated_at: Date.now(),
+    });
+    return { ok: true, id: info.lastInsertRowid };
+  });
+
+  ipcMain.on('session:end', () => {
+    if (!activeSession || appRole !== 'dm') return;
+    db.endSession.run({ id: activeSession.id, ended_at: Date.now() });
+    activeSession = null;
+  });
+}
+
+function generateSessionCode() {
+  return Math.random().toString(36).slice(2, 8).toUpperCase();
+}

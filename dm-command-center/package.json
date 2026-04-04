@@ -1,0 +1,23 @@
+{
+  "name": "dm-command-center",
+  "version": "1.0.0",
+  "description": "The DM's Command Center — Elminster Edition",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev"
+  },
+  "keywords": ["dnd", "roll20", "dndbeyond", "discord", "electron"],
+  "author": "Raduk",
+  "license": "MIT",
+  "dependencies": {
+    "better-sqlite3": "^9.4.3"
+  },
+  "devDependencies": {
+    "electron": "^29.1.0"
+  },
+  "build": {
+    "appId": "com.raduk.dmcommandcenter",
+    "productName": "DM Command Center"
+  }
+}

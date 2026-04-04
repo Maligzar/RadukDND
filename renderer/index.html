@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'">
+<title>DM Command Center</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #0d0b08;
+    color: #c9b08a;
+    font-family: 'IM Fell English', Georgia, serif;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    -webkit-app-region: no-drag;
+  }
+
+  /* ── Header bar (always visible, app drag region) ── */
+  #header {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 34px;
+    background: linear-gradient(to bottom, #1a120a, #100d08);
+    border-bottom: 1px solid #c8922a;
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    gap: 10px;
+    -webkit-app-region: drag;
+    z-index: 100;
+  }
+  #header-logo {
+    font-family: 'Cinzel', serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: #e8b84a;
+    letter-spacing: 0.12em;
+    -webkit-app-region: no-drag;
+  }
+  .horde-crest {
+    width: 18px; height: 18px;
+    flex-shrink: 0;
+  }
+
+  /* ── Modal backdrop ── */
+  #modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(6,4,2,0.88);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+  }
+
+  /* ── Picker panel ── */
+  #picker {
+    background: #161210;
+    border: 1px solid #4a3c28;
+    outline: 1px solid #0a0806;
+    outline-offset: -3px;
+    width: 480px;
+    padding: 0;
+    position: relative;
+  }
+
+  .picker-header {
+    background: linear-gradient(to right, #8c1a1a, #4a0c0c);
+    border-bottom: 1px solid #c8922a;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .picker-header-title {
+    font-family: 'Cinzel', serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: #e8b84a;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    flex: 1;
+  }
+  .gem {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #cc2a2a;
+    border: 1px solid #c8922a;
+    flex-shrink: 0;
+  }
+
+  .picker-body {
+    padding: 24px 20px 20px;
+  }
+
+  /* ── Role buttons ── */
+  .role-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .role-btn {
+    background: #1e1916;
+    border: 1px solid #4a3c28;
+    color: #a08060;
+    font-family: 'Cinzel', serif;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 14px 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+    position: relative;
+  }
+  .role-btn:hover {
+    border-color: #6b5535;
+    color: #c9b08a;
+    background: #252019;
+  }
+  .role-btn.selected {
+    background: rgba(140,26,26,0.18);
+    border-color: #8c1a1a;
+    color: #e8dcc8;
+  }
+  .role-btn.selected::after {
+    content: '';
+    position: absolute;
+    bottom: -1px; left: 0; right: 0;
+    height: 2px;
+    background: #cc2a2a;
+  }
+  .role-label-sub {
+    display: block;
+    font-family: 'IM Fell English', serif;
+    font-size: 11px;
+    font-weight: 400;
+    color: #705a3a;
+    letter-spacing: 0;
+    text-transform: none;
+    margin-top: 4px;
+  }
+
+  /* ── Form fields ── */
+  .field-group {
+    margin-bottom: 16px;
+  }
+  .field-label {
+    display: block;
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    font-weight: 600;
+    color: #c8922a;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .field-input {
+    width: 100%;
+    background: #1e1916;
+    border: 1px solid #4a3c28;
+    color: #e8dcc8;
+    font-family: 'IM Fell English', serif;
+    font-size: 14px;
+    padding: 8px 10px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .field-input:focus {
+    border-color: #c8922a;
+  }
+  .field-input::placeholder {
+    color: #4a3820;
+  }
+
+  /* ── Divider ── */
+  .divider {
+    height: 1px;
+    background: linear-gradient(to right, transparent, #4a3c28, #6b5535, #4a3c28, transparent);
+    margin: 20px 0;
+  }
+
+  /* ── Enter button ── */
+  #enter-btn {
+    width: 100%;
+    background: #8c1a1a;
+    border: 1px solid #b02020;
+    color: #e8b84a;
+    font-family: 'Cinzel', serif;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 12px;
+    cursor: pointer;
+    transition: background 0.15s;
+    margin-top: 4px;
+  }
+  #enter-btn:hover { background: #b02020; }
+  #enter-btn:active { background: #cc2a2a; transform: scale(0.99); }
+  #enter-btn:disabled {
+    background: #2e2418;
+    border-color: #3a2e1e;
+    color: #4a3820;
+    cursor: not-allowed;
+  }
+
+  /* ── Error message ── */
+  #error-msg {
+    font-family: 'IM Fell English', serif;
+    font-size: 12px;
+    color: #cc2a2a;
+    margin-top: 8px;
+    min-height: 16px;
+    text-align: center;
+  }
+
+  /* ── Footer note ── */
+  .picker-footer {
+    padding: 10px 20px 14px;
+    border-top: 1px solid rgba(74,60,40,0.4);
+    text-align: center;
+  }
+  .picker-footer span {
+    font-family: 'Cinzel', serif;
+    font-size: 9px;
+    color: #4a3820;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  /* ── Loading state (after submit) ── */
+  #loading {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: #0d0b08;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 16px;
+    z-index: 200;
+  }
+  #loading.visible {
+    display: flex;
+  }
+  #loading-text {
+    font-family: 'Cinzel', serif;
+    font-size: 14px;
+    color: #c8922a;
+    letter-spacing: 0.12em;
+  }
+  .loading-bar {
+    width: 240px;
+    height: 2px;
+    background: #1e1916;
+    border: 1px solid #4a3c28;
+    overflow: hidden;
+  }
+  .loading-fill {
+    height: 100%;
+    background: #8c1a1a;
+    animation: loadfill 1.4s ease-in-out infinite;
+  }
+  @keyframes loadfill {
+    0%   { width: 0%; margin-left: 0%; }
+    50%  { width: 60%; margin-left: 20%; }
+    100% { width: 0%; margin-left: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Header bar -->
+<div id="header">
+  <svg class="horde-crest" viewBox="0 0 20 20" fill="none">
+    <path d="M10 2L13 7H17L14 11L15 16L10 13L5 16L6 11L3 7H7L10 2Z"
+          fill="#8c1a1a" stroke="#c8922a" stroke-width="0.8"/>
+  </svg>
+  <span id="header-logo">DM Command Center</span>
+</div>
+
+<!-- Role picker modal -->
+<div id="modal-backdrop">
+  <div id="picker">
+
+    <div class="picker-header">
+      <div class="gem"></div>
+      <span class="picker-header-title">Choose your role</span>
+      <div class="gem"></div>
+    </div>
+
+    <div class="picker-body">
+
+      <!-- Role selection -->
+      <div class="role-row">
+        <button class="role-btn" id="btn-player" onclick="selectRole('player')">
+          Player
+          <span class="role-label-sub">Roll capture · Oracle · Party view</span>
+        </button>
+        <button class="role-btn" id="btn-dm" onclick="selectRole('dm')">
+          Dungeon Master
+          <span class="role-label-sub">Full control · Encounter gen · HP scrape</span>
+        </button>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Character name -->
+      <div class="field-group">
+        <label class="field-label" for="char-name">Character name</label>
+        <input class="field-input" id="char-name" type="text"
+               placeholder="e.g. Gorrak Stonefist"
+               autocomplete="off" spellcheck="false"
+               oninput="validate()">
+      </div>
+
+      <!-- Player name -->
+      <div class="field-group">
+        <label class="field-label" for="player-name">Your name</label>
+        <input class="field-input" id="player-name" type="text"
+               placeholder="e.g. Raduk"
+               autocomplete="off" spellcheck="false"
+               oninput="validate()">
+      </div>
+
+      <!-- Session code (hidden for now, shown when relay is live in Phase 11) -->
+      <div class="field-group" id="session-code-group" style="display:none">
+        <label class="field-label" for="session-code">Session code</label>
+        <input class="field-input" id="session-code" type="text"
+               placeholder="e.g. AB3F7K"
+               autocomplete="off" spellcheck="false"
+               maxlength="6" style="text-transform:uppercase"
+               oninput="this.value=this.value.toUpperCase(); validate()">
+      </div>
+
+      <div id="error-msg"></div>
+
+      <button id="enter-btn" onclick="submit()" disabled>
+        Enter the War Room
+      </button>
+
+    </div>
+
+    <div class="picker-footer">
+      <span>For the Horde &mdash; Elminster Edition</span>
+    </div>
+
+  </div>
+</div>
+
+<!-- Loading screen (shown after submit while views mount) -->
+<div id="loading">
+  <svg width="40" height="40" viewBox="0 0 20 20" fill="none">
+    <path d="M10 2L13 7H17L14 11L15 16L10 13L5 16L6 11L3 7H7L10 2Z"
+          fill="#8c1a1a" stroke="#c8922a" stroke-width="0.8"/>
+  </svg>
+  <span id="loading-text">Summoning the war council...</span>
+  <div class="loading-bar"><div class="loading-fill"></div></div>
+</div>
+
+<script>
+  let selectedRole = null;
+
+  function selectRole(role) {
+    selectedRole = role;
+    document.getElementById('btn-player').classList.toggle('selected', role === 'player');
+    document.getElementById('btn-dm').classList.toggle('selected', role === 'dm');
+
+    // Show session code field only for DM (Phase 11 — hidden for now)
+    // document.getElementById('session-code-group').style.display =
+    //   role === 'dm' ? 'none' : 'block';
+
+    validate();
+  }
+
+  function validate() {
+    const charName   = document.getElementById('char-name').value.trim();
+    const playerName = document.getElementById('player-name').value.trim();
+    const btn        = document.getElementById('enter-btn');
+    const err        = document.getElementById('error-msg');
+
+    err.textContent = '';
+
+    if (!selectedRole) {
+      btn.disabled = true;
+      return;
+    }
+    if (!charName) {
+      btn.disabled = true;
+      return;
+    }
+    if (!playerName) {
+      btn.disabled = true;
+      return;
+    }
+
+    btn.disabled = false;
+  }
+
+  async function submit() {
+    const charName   = document.getElementById('char-name').value.trim();
+    const playerName = document.getElementById('player-name').value.trim();
+    const sessionCode = document.getElementById('session-code').value.trim() || null;
+    const err        = document.getElementById('error-msg');
+
+    if (!selectedRole || !charName || !playerName) return;
+
+    // Show loading screen
+    document.getElementById('loading').classList.add('visible');
+    document.getElementById('loading-text').textContent =
+      selectedRole === 'dm'
+        ? 'Raising the war banner...'
+        : 'Joining the adventuring party...';
+
+    try {
+      const result = await window.electronAPI.invoke('session:set-role', {
+        role:          selectedRole,
+        characterName: charName,
+        playerName:    playerName,
+        sessionCode:   sessionCode,
+        partyLevel:    1,
+        partySize:     6,
+      });
+
+      if (!result?.ok) {
+        throw new Error('Session creation failed');
+      }
+
+      // Views are now mounting — main.js takes over from here
+      // The overlay HTML will load in the sidebar WebContentsView
+      // This window stays as the shell behind the views
+
+    } catch (err_) {
+      document.getElementById('loading').classList.remove('visible');
+      err.textContent = 'Failed to start session. Check the console.';
+      console.error('[picker] session:set-role failed:', err_);
+    }
+  }
+
+  // Pre-select Player since that's the primary use case right now
+  selectRole('player');
+
+  // Allow Enter key to submit
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const btn = document.getElementById('enter-btn');
+      if (!btn.disabled) submit();
+    }
+  });
+</script>
+</body>
+</html>
