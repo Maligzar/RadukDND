@@ -41,10 +41,49 @@
     color: #e8b84a;
     letter-spacing: 0.12em;
     -webkit-app-region: no-drag;
+    flex: 1;
   }
   .horde-crest {
     width: 18px; height: 18px;
     flex-shrink: 0;
+  }
+
+  /* ── Window control buttons (Phase 10) ── */
+  .win-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    -webkit-app-region: no-drag;
+    margin-left: auto;
+  }
+  .win-btn {
+    width: 26px; height: 20px;
+    background: transparent;
+    border: 1px solid #3a2e1e;
+    color: #705a3a;
+    font-size: 11px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.12s;
+    padding: 0;
+  }
+  .win-btn:hover {
+    border-color: #c8922a;
+    color: #c9b08a;
+    background: rgba(200,146,42,0.08);
+  }
+  .win-btn.exit:hover {
+    border-color: #8c1a1a;
+    color: #cc2a2a;
+    background: rgba(140,26,26,0.15);
+  }
+  /* SVG icons inside win buttons */
+  .win-btn svg {
+    width: 10px; height: 10px;
+    fill: currentColor;
   }
 
   /* ── Modal backdrop ── */
@@ -79,7 +118,7 @@
   }
   .picker-header-title {
     font-family: 'Cinzel', serif;
-    font-size: 13px;
+    font-size: 14px;           /* +1px */
     font-weight: 600;
     color: #e8b84a;
     letter-spacing: 0.14em;
@@ -110,7 +149,7 @@
     border: 1px solid #4a3c28;
     color: #a08060;
     font-family: 'Cinzel', serif;
-    font-size: 12px;
+    font-size: 13px;           /* +1px */
     font-weight: 600;
     letter-spacing: 0.1em;
     text-transform: uppercase;
@@ -140,7 +179,7 @@
   .role-label-sub {
     display: block;
     font-family: 'IM Fell English', serif;
-    font-size: 11px;
+    font-size: 12px;           /* +1px */
     font-weight: 400;
     color: #705a3a;
     letter-spacing: 0;
@@ -155,7 +194,7 @@
   .field-label {
     display: block;
     font-family: 'Cinzel', serif;
-    font-size: 10px;
+    font-size: 11px;           /* +1px */
     font-weight: 600;
     color: #c8922a;
     letter-spacing: 0.12em;
@@ -168,7 +207,7 @@
     border: 1px solid #4a3c28;
     color: #e8dcc8;
     font-family: 'IM Fell English', serif;
-    font-size: 14px;
+    font-size: 15px;           /* +1px */
     padding: 8px 10px;
     outline: none;
     transition: border-color 0.15s;
@@ -194,7 +233,7 @@
     border: 1px solid #b02020;
     color: #e8b84a;
     font-family: 'Cinzel', serif;
-    font-size: 12px;
+    font-size: 13px;           /* +1px */
     font-weight: 600;
     letter-spacing: 0.14em;
     text-transform: uppercase;
@@ -215,7 +254,7 @@
   /* ── Error message ── */
   #error-msg {
     font-family: 'IM Fell English', serif;
-    font-size: 12px;
+    font-size: 13px;           /* +1px */
     color: #cc2a2a;
     margin-top: 8px;
     min-height: 16px;
@@ -230,7 +269,7 @@
   }
   .picker-footer span {
     font-family: 'Cinzel', serif;
-    font-size: 9px;
+    font-size: 10px;           /* +1px */
     color: #4a3820;
     letter-spacing: 0.1em;
     text-transform: uppercase;
@@ -253,7 +292,7 @@
   }
   #loading-text {
     font-family: 'Cinzel', serif;
-    font-size: 14px;
+    font-size: 15px;           /* +1px */
     color: #c8922a;
     letter-spacing: 0.12em;
   }
@@ -285,6 +324,39 @@
           fill="#8c1a1a" stroke="#c8922a" stroke-width="0.8"/>
   </svg>
   <span id="header-logo">DM Command Center</span>
+
+  <!-- Phase 10: Window controls -->
+  <div class="win-controls">
+    <!-- Minimize -->
+    <button class="win-btn" id="btn-minimize" title="Minimize"
+            onclick="window.electronAPI.send('window:minimize')">
+      <svg viewBox="0 0 10 10"><rect x="1" y="4.5" width="8" height="1.2"/></svg>
+    </button>
+    <!-- Fullscreen toggle -->
+    <button class="win-btn" id="btn-fullscreen" title="Toggle fullscreen"
+            onclick="window.electronAPI.send('window:fullscreen')">
+      <svg viewBox="0 0 10 10">
+        <rect x="1" y="1" width="3.2" height="1.2"/>
+        <rect x="1" y="1" width="1.2" height="3.2"/>
+        <rect x="5.8" y="1" width="3.2" height="1.2"/>
+        <rect x="7.8" y="1" width="1.2" height="3.2"/>
+        <rect x="1" y="7.8" width="3.2" height="1.2"/>
+        <rect x="1" y="5.8" width="1.2" height="3.2"/>
+        <rect x="5.8" y="7.8" width="3.2" height="1.2"/>
+        <rect x="7.8" y="5.8" width="1.2" height="3.2"/>
+      </svg>
+    </button>
+    <!-- Exit -->
+    <button class="win-btn exit" id="btn-exit" title="Exit"
+            onclick="confirmExit()">
+      <svg viewBox="0 0 10 10">
+        <line x1="1" y1="1" x2="9" y2="9" stroke="currentColor" stroke-width="1.4"
+              stroke-linecap="round"/>
+        <line x1="9" y1="1" x2="1" y2="9" stroke="currentColor" stroke-width="1.4"
+              stroke-linecap="round"/>
+      </svg>
+    </button>
+  </div>
 </div>
 
 <!-- Role picker modal -->
@@ -331,7 +403,7 @@
                oninput="validate()">
       </div>
 
-      <!-- Session code (hidden for now, shown when relay is live in Phase 11) -->
+      <!-- Session code (hidden until Phase 11 relay is live) -->
       <div class="field-group" id="session-code-group" style="display:none">
         <label class="field-label" for="session-code">Session code</label>
         <input class="field-input" id="session-code" type="text"
@@ -369,14 +441,25 @@
 <script>
   let selectedRole = null;
 
+  // ── Phase 10: Exit confirmation ─────────────────────────────
+  function confirmExit() {
+    // Only confirm if a session is in progress (loading screen is visible)
+    const inSession = document.getElementById('loading').classList.contains('visible');
+    if (inSession) {
+      if (!confirm('End session and close DM Command Center?')) return;
+    }
+    window.electronAPI.send('window:exit');
+  }
+
+  // ── Role picker ─────────────────────────────────────────────
   function selectRole(role) {
     selectedRole = role;
     document.getElementById('btn-player').classList.toggle('selected', role === 'player');
     document.getElementById('btn-dm').classList.toggle('selected', role === 'dm');
 
-    // Show session code field only for DM (Phase 11 — hidden for now)
+    // Session code field shown for Player role in Phase 11 (relay live)
     // document.getElementById('session-code-group').style.display =
-    //   role === 'dm' ? 'none' : 'block';
+    //   role === 'player' ? 'block' : 'none';
 
     validate();
   }
@@ -389,31 +472,21 @@
 
     err.textContent = '';
 
-    if (!selectedRole) {
-      btn.disabled = true;
-      return;
-    }
-    if (!charName) {
-      btn.disabled = true;
-      return;
-    }
-    if (!playerName) {
-      btn.disabled = true;
-      return;
-    }
+    if (!selectedRole) { btn.disabled = true; return; }
+    if (!charName)     { btn.disabled = true; return; }
+    if (!playerName)   { btn.disabled = true; return; }
 
     btn.disabled = false;
   }
 
   async function submit() {
-    const charName   = document.getElementById('char-name').value.trim();
-    const playerName = document.getElementById('player-name').value.trim();
+    const charName    = document.getElementById('char-name').value.trim();
+    const playerName  = document.getElementById('player-name').value.trim();
     const sessionCode = document.getElementById('session-code').value.trim() || null;
-    const err        = document.getElementById('error-msg');
+    const err         = document.getElementById('error-msg');
 
     if (!selectedRole || !charName || !playerName) return;
 
-    // Show loading screen
     document.getElementById('loading').classList.add('visible');
     document.getElementById('loading-text').textContent =
       selectedRole === 'dm'
@@ -430,13 +503,10 @@
         partySize:     6,
       });
 
-      if (!result?.ok) {
-        throw new Error('Session creation failed');
-      }
+      if (!result?.ok) throw new Error('Session creation failed');
 
-      // Views are now mounting — main.js takes over from here
-      // The overlay HTML will load in the sidebar WebContentsView
-      // This window stays as the shell behind the views
+      // Views are now mounting — main.js takes over layout.
+      // The shell window stays as the drag/controls layer behind BrowserViews.
 
     } catch (err_) {
       document.getElementById('loading').classList.remove('visible');
@@ -445,10 +515,10 @@
     }
   }
 
-  // Pre-select Player since that's the primary use case right now
+  // Pre-select Player as the primary use case
   selectRole('player');
 
-  // Allow Enter key to submit
+  // Enter key submits
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       const btn = document.getElementById('enter-btn');

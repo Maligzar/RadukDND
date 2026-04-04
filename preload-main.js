@@ -1,14 +1,15 @@
 'use strict';
 /**
  * preload-main.js
- * Runs in the overlay WebContentsView (overlay-dm.html / overlay-player.html).
- * Exposes a minimal, safe ipcRenderer bridge to the overlay HTML via
- * contextBridge. No Node.js APIs are exposed directly.
+ * Runs in the shell BrowserWindow (index.html) and the overlay
+ * WebContentsView (overlay-dm.html / overlay-player.html).
+ * Exposes a minimal, safe ipcRenderer bridge via contextBridge.
+ * No Node.js APIs are exposed directly.
  */
 
 const { contextBridge, ipcRenderer } = require('electron');
 
-// Channels the overlay is allowed to SEND to main
+// Channels the renderer is allowed to SEND to main (fire-and-forget)
 const ALLOWED_SEND = new Set([
   'roll:captured',
   'hp:update',
@@ -16,9 +17,13 @@ const ALLOWED_SEND = new Set([
   'initiative:clear',
   'discord:resize',
   'session:end',
+  // Phase 10: window controls
+  'window:exit',
+  'window:fullscreen',
+  'window:minimize',
 ]);
 
-// Channels the overlay is allowed to INVOKE (request/response)
+// Channels the renderer is allowed to INVOKE (request/response)
 const ALLOWED_INVOKE = new Set([
   'session:set-role',
   'rolls:get',
@@ -29,7 +34,7 @@ const ALLOWED_INVOKE = new Set([
   'encounter:save',
 ]);
 
-// Channels the overlay is allowed to RECEIVE from main
+// Channels the renderer is allowed to RECEIVE from main
 const ALLOWED_RECEIVE = new Set([
   'roll:display',
   'hp:update',

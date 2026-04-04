@@ -15,10 +15,14 @@ let activeSession = null;
 let appRole       = null;
 
 // BrowserView references (Electron 29 API for embedded panels)
-let ddbView     = null;
-let roll20View  = null;
-let discordView = null;
-let overlayView = null;
+let titlebarView = null; // always-on-top full-width title bar
+let ddbView      = null;
+let roll20View   = null;
+let discordView  = null;
+let overlayView  = null;
+
+// Phase 10: guard against duplicate createViews() calls
+let viewsCreated = false;
 
 const HEADER_H  = 34;
 const DISCORD_H = 160;
@@ -60,11 +64,40 @@ function createMainWindow() {
   mainWindow.show();
   mainWindow.focus();
 
-  mainWindow.on('resize', () => layoutViews());
+  // Titlebar view — full width, always on top, created immediately so it's
+  // visible from launch and never covered by other BrowserViews.
+  titlebarView = new BrowserView({
+    webPreferences: {
+      preload: path.join(__dirname, 'preload-main.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  mainWindow.addBrowserView(titlebarView);
+  titlebarView.webContents.loadFile(path.join(__dirname, 'renderer', 'titlebar.html'));
+  layoutTitlebar();
+
+  mainWindow.on('resize', () => {
+    layoutTitlebar();
+    layoutViews();
+  });
 }
 
 // ─────────────────────────────────────────────────────────────
-// Layout — positions all BrowserViews
+// Titlebar layout — always full width, always at y:0
+// Called on startup and every resize.
+// ─────────────────────────────────────────────────────────────
+function layoutTitlebar() {
+  if (!mainWindow || !titlebarView) return;
+  const [winW] = mainWindow.getContentSize();
+  titlebarView.setBounds({ x: 0, y: 0, width: winW, height: HEADER_H });
+  // Ensure titlebar stays on top by re-adding it last
+  mainWindow.removeBrowserView(titlebarView);
+  mainWindow.addBrowserView(titlebarView);
+}
+
+// ─────────────────────────────────────────────────────────────
+// Layout — positions all content BrowserViews below the titlebar
 // ─────────────────────────────────────────────────────────────
 function layoutViews() {
   if (!mainWindow || !appRole) return;
@@ -73,24 +106,36 @@ function layoutViews() {
   const contentTop   = HEADER_H + discordStripH;
   const contentH     = winH - contentTop;
   const mainW        = winW - SIDEBAR_W;
+  const sidebarH     = winH - HEADER_H;
 
+  // Discord strip spans full width below the titlebar
   if (discordView) discordView.setBounds({ x: 0, y: HEADER_H, width: winW, height: discordStripH });
 
   if (appRole === 'player') {
     if (ddbView)     ddbView.setBounds({ x: 0, y: contentTop, width: mainW, height: contentH });
-    if (overlayView) overlayView.setBounds({ x: mainW, y: contentTop, width: SIDEBAR_W, height: contentH });
+    if (overlayView) overlayView.setBounds({ x: mainW, y: HEADER_H, width: SIDEBAR_W, height: sidebarH });
     if (roll20View)  roll20View.setBounds({ x: 0, y: 0, width: 0, height: 0 });
   } else if (appRole === 'dm') {
     if (roll20View)  roll20View.setBounds({ x: 0, y: contentTop, width: mainW, height: contentH });
-    if (overlayView) overlayView.setBounds({ x: mainW, y: contentTop, width: SIDEBAR_W, height: contentH });
+    if (overlayView) overlayView.setBounds({ x: mainW, y: HEADER_H, width: SIDEBAR_W, height: sidebarH });
     if (ddbView)     ddbView.setBounds({ x: 0, y: 0, width: 0, height: 0 });
   }
+
+  // Keep titlebar on top after every layout
+  layoutTitlebar();
 }
 
 // ─────────────────────────────────────────────────────────────
 // Create BrowserViews after role picker submits
+// Phase 10: guard prevents duplicate invocation
 // ─────────────────────────────────────────────────────────────
 function createViews(role) {
+  if (viewsCreated) {
+    console.warn('[main] createViews() called more than once — ignored');
+    return;
+  }
+  viewsCreated = true;
+
   // Discord strip placeholder
   discordView = new BrowserView({
     webPreferences: { contextIsolation: true, nodeIntegration: false },
@@ -141,6 +186,22 @@ function createViews(role) {
 // ─────────────────────────────────────────────────────────────
 function registerIpcHandlers() {
 
+  // ── Phase 10: Window controls ──────────────────────────────
+  ipcMain.on('window:exit', () => {
+    app.quit();
+  });
+
+  ipcMain.on('window:fullscreen', () => {
+    if (!mainWindow) return;
+    mainWindow.setFullScreen(!mainWindow.isFullScreen());
+  });
+
+  ipcMain.on('window:minimize', () => {
+    if (!mainWindow) return;
+    mainWindow.minimize();
+  });
+
+  // ── Role picker ────────────────────────────────────────────
   ipcMain.handle('session:set-role', async (_, { role, characterName, playerName, sessionCode, partyLevel, partySize }) => {
     appRole = role;
 
@@ -173,6 +234,7 @@ function registerIpcHandlers() {
     return { ok: true, session: activeSession };
   });
 
+  // ── Roll capture ───────────────────────────────────────────
   ipcMain.on('roll:captured', (_, payload) => {
     if (!activeSession) return;
     const roll = {
@@ -196,6 +258,7 @@ function registerIpcHandlers() {
     // TODO Phase 11: relaySocket?.emit('roll:broadcast', roll);
   });
 
+  // ── HP update (DM only) ────────────────────────────────────
   ipcMain.on('hp:update', (_, { combatant_name, hp_current }) => {
     if (!activeSession || appRole !== 'dm') return;
     campaignDb.prepare(`UPDATE initiative SET hp_current=? WHERE session_id=? AND combatant_name=?`)
@@ -203,6 +266,7 @@ function registerIpcHandlers() {
     overlayView?.webContents.send('hp:update', { combatant_name, hp_current });
   });
 
+  // ── Initiative ─────────────────────────────────────────────
   ipcMain.handle('initiative:get', () => {
     if (!activeSession) return [];
     return db.getInitiative.all(activeSession.id);
@@ -227,18 +291,23 @@ function registerIpcHandlers() {
     overlayView?.webContents.send('initiative:sync', []);
   });
 
-  ipcMain.handle('rolls:get', (_, { dmMode } = {}) => {
+  // ── Roll history — Phase 10 fix: dmMode derived from appRole, not renderer ──
+  ipcMain.handle('rolls:get', () => {
     if (!activeSession) return [];
-    return dmMode ? db.getAllRollsDM.all(activeSession.id) : db.getPublicRolls.all(activeSession.id);
+    return appRole === 'dm'
+      ? db.getAllRollsDM.all(activeSession.id)
+      : db.getPublicRolls.all(activeSession.id);
   });
 
+  // ── Discord strip resize ───────────────────────────────────
   ipcMain.on('discord:resize', (_, { height }) => {
     discordStripH = Math.max(60, Math.min(320, height));
     layoutViews();
   });
 
+  // ── Bestiary — Phase 10 fix: DM role gate added ───────────
   ipcMain.handle('bestiary:query', (_, { crMin, crMax, environment, type, limit }) => {
-    if (!bestiaryDb) return [];
+    if (!bestiaryDb || appRole !== 'dm') return [];
     let sql = `SELECT m.* FROM monsters m WHERE m.cr >= @crMin AND m.cr <= @crMax`;
     const params = { crMin: crMin ?? 0, crMax: crMax ?? 30, limit: limit ?? 20 };
     if (environment) { sql += ` AND m.id IN (SELECT monster_id FROM monster_environments WHERE environment=@environment)`; params.environment = environment; }
@@ -248,7 +317,7 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('bestiary:get-monster', (_, { id }) => {
-    if (!bestiaryDb) return null;
+    if (!bestiaryDb || appRole !== 'dm') return null;
     const monster = bestiaryDb.prepare(`SELECT * FROM monsters WHERE id=?`).get(id);
     if (!monster) return null;
     monster.actions = bestiaryDb.prepare(`SELECT * FROM monster_actions WHERE monster_id=? ORDER BY action_type`).all(id);
@@ -256,6 +325,7 @@ function registerIpcHandlers() {
     return monster;
   });
 
+  // ── Encounter save (DM only) ───────────────────────────────
   ipcMain.handle('encounter:save', (_, encounter) => {
     if (!activeSession || appRole !== 'dm') return { ok: false };
     const info = db.insertEncounter.run({
@@ -265,6 +335,7 @@ function registerIpcHandlers() {
     return { ok: true, id: info.lastInsertRowid };
   });
 
+  // ── Session end (DM only) ──────────────────────────────────
   ipcMain.on('session:end', () => {
     if (!activeSession || appRole !== 'dm') return;
     db.endSession.run({ id: activeSession.id, ended_at: Date.now() });
