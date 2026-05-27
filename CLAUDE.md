@@ -145,11 +145,74 @@ socket.on('player:left', (playerCount) => {...});
 
 ---
 
+## Phase 12: Initiative Tracker & Combat UI
+
+### Objectives
+1. **Full combat workflow** — Add/remove combatants, roll initiative, track turn order
+2. **Live HP tracking** — Display current/max HP, visual health bars
+3. **Turn management** — Highlight active combatant, advance turns
+4. **Multi-player sync** — All clients see consistent initiative state
+5. **Round counter** — Track combat rounds and total time
+
+### Implementation Plan
+
+#### Step 1: Create Initiative Tracker HTML/CSS
+**New file:** `renderer/initiative-tracker.html`
+- Combat control panel with:
+  - Round counter (starts at 1)
+  - Add combatant form (name, AC, HP, initiative roll)
+  - Combat roster table (name, initiative, HP bar, AC, turn indicator)
+  - Action buttons: Start Combat, Next Turn, Clear Combat
+  - Roll initiative for all button
+
+#### Step 2: Create Tracker JavaScript Logic
+**New file:** `renderer/initiative-tracker.js`
+- IPC communication: fetch combatants, add/update combatant
+- Initiative roll logic: d20 + modifiers
+- Turn advancement: skip dead/unconscious
+- HP updates from Roll20 (real-time)
+- Relay event listeners for multi-player sync
+
+#### Step 3: Integrate into Overlay
+**Modify:** `renderer/overlay-dm.html` / `renderer/overlay-player.html`
+- Tab system: "Rolls" | "Initiative" | "Actions"
+- Initiative tab shows full tracker
+- Collapse/expand for space management
+- DM-only controls (add/manage), Player-readonly view
+
+#### Step 4: Roll20 HP Sync
+**Enhance:** `src/preload-r20.js`
+- When Roll20 token HP changes, emit `hp:update` to relay
+- Parse damage rolls from Roll20 chat: "-5 damage to Goblin"
+- Auto-subtract from initiative tracker HP
+
+### UI Mockup
+```
+┌─────────────────────────────────────┐
+│ COMBAT TRACKER      [Round 3]        │
+├─────────────────────────────────────┤
+│ [+ Add Combatant] [Roll Initiative]  │
+├─────────────────────────────────────┤
+│ NAME        | INIT | HP      | AC  → │
+│ Glendorak   | 18   | 47/50  ▓▓▓ | 16│ ← ACTIVE
+│ Goblin 1    | 14   | 8/12   ▓▓  | 15│
+│ Goblin 2    | 12   | 0/12   ░░  | 15│ (dead)
+│ Giant       | 9    | 52/65  ▓▓▓ | 17│
+├─────────────────────────────────────┤
+│ [Previous Turn] [Next Turn] [Clear] │
+└─────────────────────────────────────┘
+```
+
+### Database Updates (if needed)
+- `initiative` table already stores: id, session_id, combatant_name, initiative_roll, hp_current, hp_max, ac, is_active_turn
+- No schema changes needed
+
+---
+
 ## Phase 12+ Roadmap
 
 | Feature | Phase | Effort | Blocker |
 |---------|-------|--------|---------|
-| Initiative Tracker Panel (full combat UI) | 12 | 2 weeks | None |
 | Discord Webhooks (critical hit alerts) | 12 | 1 week | None |
 | Character URL Switcher | 12 | 3 days | None |
 | Session Recap PDF Export | 13 | 1 week | None |
@@ -186,7 +249,7 @@ Run two instances of the app:
 
 ---
 
-## Current Branch
-Working on: `claude/md-review-planning-Tx6kt`
-
-Push to: `main` (after PR review)
+## Current Status
+- **Phase:** 12 (Initiative Tracker Panel)
+- **Branch:** `master` (Phase 11 merged)
+- **Next:** Build initiative tracker UI, HP sync, turn management
