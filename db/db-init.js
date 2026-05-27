@@ -157,8 +157,7 @@ function openBestiaryDb() {
   }
 
   const db = new Database(dbPath, { readonly: true, fileMustExist: true });
-  db.pragma('journal_mode = WAL');
-
+  // WAL pragma requires a write — skip it for read-only bestiary
   ensureBestiarySchema(db);
   return db;
 }
