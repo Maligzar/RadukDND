@@ -1,130 +1,146 @@
 'use strict';
 
-// Role picker logic — shows modal on startup to select DM or Player
-// and manage session code entry/display
-
 const ipcRenderer = window.ipcRenderer;
 
 let selectedRole = null;
 
 document.addEventListener('DOMContentLoaded', () => {
-  const rolePicker = document.getElementById('role-picker');
-  const roleButtons = document.querySelectorAll('.role-btn');
-  const createBtn = document.getElementById('btn-create-session');
-  const joinBtn = document.getElementById('btn-join-session');
+  setupRoleButtons();
+  setupPlayerTabs();
+  setupSubmitHandlers();
+});
 
-  // Role selection
-  roleButtons.forEach((btn) => {
+function setupRoleButtons() {
+  document.querySelectorAll('.role-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       const role = btn.getAttribute('data-role');
       selectedRole = role;
 
-      // Update active button
-      roleButtons.forEach((b) => b.classList.remove('active'));
+      document.querySelectorAll('.role-btn').forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
 
-      // Show corresponding form
-      document.querySelectorAll('.role-form').forEach((form) => {
-        form.classList.remove('active');
-      });
+      document.querySelectorAll('.role-form').forEach((f) => f.classList.remove('active'));
       document.querySelector(`.role-form[data-role="${role}"]`)?.classList.add('active');
     });
   });
+}
 
-  // DM: Create session
-  createBtn?.addEventListener('click', async () => {
-    const dmName = document.getElementById('dm-name').value || 'Dungeon Master';
+function setupPlayerTabs() {
+  document.querySelectorAll('.player-tab').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      const ptab = tab.getAttribute('data-ptab');
+
+      document.querySelectorAll('.player-tab').forEach((t) => t.classList.remove('active'));
+      tab.classList.add('active');
+
+      document.querySelectorAll('.player-tab-content').forEach((c) => c.classList.remove('active'));
+      document.querySelector(`.player-tab-content[data-ptab="${ptab}"]`)?.classList.add('active');
+    });
+  });
+}
+
+function setupSubmitHandlers() {
+  // ── DM: create session ──────────────────────────────────
+  document.getElementById('btn-create-session')?.addEventListener('click', async () => {
+    const playerName = document.getElementById('dm-name').value.trim() || 'Dungeon Master';
     const partyLevel = parseInt(document.getElementById('party-level').value) || 5;
-    const partySize = parseInt(document.getElementById('party-size').value) || 4;
+    const partySize  = parseInt(document.getElementById('party-size').value) || 4;
 
-    try {
-      const result = await ipcRenderer.invoke('session:set-role', {
-        role: 'dm',
-        playerName: dmName,
-        partyLevel,
-        partySize,
-      });
+    const result = await ipcRenderer.invoke('session:set-role', {
+      role: 'dm',
+      playerName,
+      partyLevel,
+      partySize,
+    });
 
-      if (result.ok) {
-        showSessionCreated(result.session.code);
-      }
-    } catch (err) {
-      alert('Error creating session: ' + err.message);
-    }
+    if (result.ok) showCodeScreen(result.session.code, 'dm');
   });
 
-  // Player: Join session
-  joinBtn?.addEventListener('click', async () => {
-    const code = document.getElementById('session-code').value.trim().toUpperCase();
+  // ── Player: create new session ──────────────────────────
+  document.getElementById('btn-player-create')?.addEventListener('click', async () => {
+    const playerName = document.getElementById('player-name-create').value.trim() || 'Player';
+
+    const result = await ipcRenderer.invoke('session:set-role', {
+      role: 'player',
+      playerName,
+      isCreating: true,
+    });
+
+    if (result.ok) showCodeScreen(result.session.code, 'player');
+  });
+
+  // ── Player: join existing session ───────────────────────
+  document.getElementById('btn-join-session')?.addEventListener('click', async () => {
+    const code       = document.getElementById('session-code').value.trim().toUpperCase();
+    const playerName = document.getElementById('player-name-join').value.trim() || 'Player';
+
     if (!code || code.length < 3) {
-      alert('Please enter a session code');
+      alert('Enter a valid session code');
       return;
     }
 
-    try {
-      const result = await ipcRenderer.invoke('session:set-role', {
-        role: 'player',
-        sessionCode: code,
-      });
+    const result = await ipcRenderer.invoke('session:set-role', {
+      role: 'player',
+      playerName,
+      sessionCode: code,
+      isCreating:  false,
+    });
 
-      if (result.ok) {
-        closePicker();
-      }
-    } catch (err) {
-      alert('Error joining session: ' + err.message);
-    }
+    if (result.ok) closePicker();
   });
 
-  // Allow Enter key to submit
+  // Enter-key shortcuts
   document.getElementById('dm-name')?.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') createBtn?.click();
+    if (e.key === 'Enter') document.getElementById('btn-create-session')?.click();
+  });
+  document.getElementById('player-name-create')?.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') document.getElementById('btn-player-create')?.click();
   });
   document.getElementById('session-code')?.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') joinBtn?.click();
+    if (e.key === 'Enter') document.getElementById('btn-join-session')?.click();
   });
-});
+  document.getElementById('player-name-join')?.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') document.getElementById('btn-join-session')?.click();
+  });
+}
 
-function showSessionCreated(sessionCode) {
+function showCodeScreen(sessionCode, role) {
   const picker = document.getElementById('role-picker');
   const box = picker.querySelector('.role-picker-box');
+  const label = role === 'dm' ? 'DM' : 'Player';
 
   box.innerHTML = `
-    <h2>✓ Session Created!</h2>
+    <h2>✓ Session Ready</h2>
     <p style="color: var(--muted); text-align: center; margin-bottom: 16px;">
-      Share this code with your players
+      Share this code with ${role === 'dm' ? 'your players' : 'the other player'}
     </p>
     <div class="session-code-display">
       <strong>${sessionCode}</strong>
       <div class="session-code-copy">Click to copy</div>
     </div>
-    <div style="margin-top: 16px; color: var(--muted); font-size: 12px; line-height: 1.5;">
-      <p>Players should:</p>
+    <div style="margin-top: 14px; color: var(--muted); font-size: 11px; line-height: 1.6;">
+      <p>Others should:</p>
       <ol style="margin-left: 16px;">
-        <li>Click "Player" on their app</li>
-        <li>Enter code <strong>${sessionCode}</strong></li>
-        <li>All rolls will sync automatically</li>
+        <li>Open the app and choose <b>${role === 'dm' ? 'Player' : 'Player → Join Session'}</b></li>
+        <li>Enter code <b style="color: var(--crit)">${sessionCode}</b></li>
+        <li>Rolls sync automatically via relay</li>
       </ol>
     </div>
-    <div style="margin-top: 20px;">
-      <button class="btn-submit" id="btn-start-game" style="width: 100%;">Start Game</button>
-    </div>
+    <button class="btn-submit" id="btn-start-game" style="width:100%;margin-top:20px;">
+      Let's Play
+    </button>
   `;
 
-  // Copy code on click
-  document.querySelector('.session-code-display')?.addEventListener('click', () => {
+  box.querySelector('.session-code-display')?.addEventListener('click', () => {
     navigator.clipboard.writeText(sessionCode);
-    const copy = document.querySelector('.session-code-copy');
-    copy.textContent = '✓ Copied!';
-    setTimeout(() => {
-      copy.textContent = 'Click to copy';
-    }, 2000);
+    const el = box.querySelector('.session-code-copy');
+    el.textContent = '✓ Copied!';
+    setTimeout(() => { el.textContent = 'Click to copy'; }, 2000);
   });
 
-  // Start game closes picker
   document.getElementById('btn-start-game')?.addEventListener('click', closePicker);
 }
 
 function closePicker() {
-  const picker = document.getElementById('role-picker');
-  picker.style.display = 'none';
+  document.getElementById('role-picker').style.display = 'none';
 }

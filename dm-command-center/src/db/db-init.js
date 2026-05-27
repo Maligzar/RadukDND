@@ -4,7 +4,7 @@ const path    = require('path');
 const fs      = require('fs');
 const Database = require('better-sqlite3');
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 function getCampaignDbPath(app) {
   return path.join(app.getPath('userData'), 'campaign.db');
@@ -30,7 +30,8 @@ function openCampaignDb(app) {
     CREATE TABLE IF NOT EXISTS sessions (
       id           INTEGER PRIMARY KEY AUTOINCREMENT,
       session_code TEXT    NOT NULL UNIQUE,
-      dm_name      TEXT    NOT NULL,
+      host_name    TEXT    NOT NULL DEFAULT 'Player',
+      host_role    TEXT    NOT NULL DEFAULT 'player' CHECK (host_role IN ('dm','player')),
       started_at   INTEGER NOT NULL,
       ended_at     INTEGER,
       status       TEXT    NOT NULL DEFAULT 'active' CHECK (status IN ('active','ended')),
@@ -266,7 +267,14 @@ function migrateIfNeeded(db, label) {
   const currentVersion = db.pragma('user_version', { simple: true });
 
   const migrations = [
-    // v1 → baseline, nothing to run (tables created above)
+    // v1 → v2: rename dm_name to host_name, add host_role column
+    (db) => {
+      db.exec(`
+        ALTER TABLE sessions RENAME COLUMN dm_name TO host_name;
+        ALTER TABLE sessions ADD COLUMN host_role TEXT NOT NULL DEFAULT 'player'
+          CHECK (host_role IN ('dm','player'));
+      `);
+    },
   ];
 
   for (let v = currentVersion; v < SCHEMA_VERSION; v++) {
@@ -293,8 +301,11 @@ function getStatements(campaignDb) {
 
     // sessions
     insertSession: campaignDb.prepare(`
-      INSERT INTO sessions (session_code, dm_name, started_at, party_level, party_size)
-      VALUES (@session_code, @dm_name, @started_at, @party_level, @party_size)
+      INSERT INTO sessions (session_code, host_name, host_role, started_at, party_level, party_size)
+      VALUES (@session_code, @host_name, @host_role, @started_at, @party_level, @party_size)
+    `),
+    getSessionByCode: campaignDb.prepare(`
+      SELECT * FROM sessions WHERE session_code=? LIMIT 1
     `),
     endSession: campaignDb.prepare(`
       UPDATE sessions SET status='ended', ended_at=@ended_at WHERE id=@id

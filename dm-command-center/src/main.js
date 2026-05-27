@@ -178,28 +178,57 @@ function registerIpcHandlers() {
 
   // ── Role picker ──────────────────────────────────────────
   // Renderer sends this when the user clicks DM or Player on launch
-  ipcMain.handle('session:set-role', async (_, { role, characterName, playerName, sessionCode, partyLevel, partySize }) => {
+  ipcMain.handle('session:set-role', async (_, { role, playerName, sessionCode, partyLevel, partySize, isCreating }) => {
     appRole = role;
 
     if (role === 'dm') {
-      const code = sessionCode || generateSessionCode();
-      const stmt = db.insertSession;
-      const info = stmt.run({
+      // DM always creates a new session
+      const code = generateSessionCode();
+      const info = db.insertSession.run({
         session_code: code,
-        dm_name:      playerName || 'Dungeon Master',
+        host_name:    playerName || 'Dungeon Master',
+        host_role:    'dm',
         started_at:   Date.now(),
         party_level:  partyLevel || 1,
-        party_size:   partySize  || 5,
+        party_size:   partySize  || 4,
       });
       activeSession = { id: info.lastInsertRowid, code, role: 'dm' };
+
+    } else if (role === 'player' && isCreating) {
+      // Player creating a new session — gets a real session_id for roll tracking
+      const code = generateSessionCode();
+      const info = db.insertSession.run({
+        session_code: code,
+        host_name:    playerName || 'Player',
+        host_role:    'player',
+        started_at:   Date.now(),
+        party_level:  1,
+        party_size:   4,
+      });
+      activeSession = { id: info.lastInsertRowid, code, role: 'player' };
+
     } else {
-      // Player: look up or wait for session from relay
-      activeSession = { code: sessionCode, role: 'player' };
+      // Player joining an existing session by code
+      // Create a local stub so rolls have a session_id in this instance's DB
+      const code = sessionCode.toUpperCase();
+      const existing = db.getSessionByCode.get(code);
+      if (existing) {
+        activeSession = { id: existing.id, code, role: 'player' };
+      } else {
+        const info = db.insertSession.run({
+          session_code: code,
+          host_name:    playerName || 'Player',
+          host_role:    'player',
+          started_at:   Date.now(),
+          party_level:  1,
+          party_size:   4,
+        });
+        activeSession = { id: info.lastInsertRowid, code, role: 'player' };
+      }
     }
 
     createViews(role);
-
-    relay.joinSession(activeSession.code, role, role === 'dm' ? playerName : null);
+    relay.joinSession(activeSession.code, role, playerName);
     setupRelayListeners();
 
     return { ok: true, session: activeSession };
@@ -280,10 +309,10 @@ function registerIpcHandlers() {
     relay.broadcastInitiativeSync([]);
   });
 
-  // ── Rolls — query for overlay ────────────────────────────
-  ipcMain.handle('rolls:get', (_, { dmMode }) => {
+  // ── Rolls — query for overlay (all roles) ───────────────
+  ipcMain.handle('rolls:get', (_) => {
     if (!activeSession) return [];
-    return dmMode
+    return appRole === 'dm'
       ? db.getAllRollsDM.all(activeSession.id)
       : db.getPublicRolls.all(activeSession.id);
   });
@@ -354,8 +383,9 @@ function registerIpcHandlers() {
 
   // ── Session end ──────────────────────────────────────────
   ipcMain.on('session:end', () => {
-    if (!activeSession || appRole !== 'dm') return;
-    db.endSession.run({ id: activeSession.id, ended_at: Date.now() });
+    if (!activeSession) return;
+    relay.leaveSession();
+    if (activeSession.id) db.endSession.run({ id: activeSession.id, ended_at: Date.now() });
     activeSession = null;
   });
 }
