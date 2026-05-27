@@ -317,6 +317,19 @@ function registerIpcHandlers() {
       : db.getPublicRolls.all(activeSession.id);
   });
 
+  // ── Roll stats ───────────────────────────────────────────
+  ipcMain.handle('stats:get', () => {
+    if (!activeSession?.id) return null;
+    const id = activeSession.id;
+    return {
+      summary:      db.getSessionStats.get(id),
+      distribution: db.getRollDistribution.get(id),
+      topActions:   db.getTopActions.all(id),
+      byType:       db.getRollsByType.all(id),
+      byPlayer:     db.getPlayerStats.all(id),
+    };
+  });
+
   // ── Session info ─────────────────────────────────────────
   ipcMain.handle('session:get-info', () => {
     if (!activeSession) return null;

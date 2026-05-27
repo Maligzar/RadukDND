@@ -157,10 +157,25 @@
       </div>
     </div>
 
-    <div class="roll-display">
-      <div id="rolls-list">
+    <div class="tab-bar" style="display:flex;gap:4px;margin-bottom:8px;border-bottom:1px solid #8b7355;padding-bottom:4px;">
+      <button class="tab-button active" data-tab="rolls" style="flex:1;padding:5px;background:#2a2520;border:1px solid #8b7355;color:#8b7355;cursor:pointer;font-family:inherit;font-size:10px;text-transform:uppercase;border-radius:3px 3px 0 0;">Rolls</button>
+      <button class="tab-button" data-tab="stats" style="flex:1;padding:5px;background:#2a2520;border:1px solid #8b7355;color:#8b7355;cursor:pointer;font-family:inherit;font-size:10px;text-transform:uppercase;border-radius:3px 3px 0 0;">Stats</button>
+    </div>
+
+    <div id="tab-rolls" class="tab-content-p" style="display:block;">
+      <div class="roll-display">
+        <div id="rolls-list">
+          <div style="color: #8b7355; text-align: center; padding: 20px;">
+            Roll some dice!
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="tab-stats" class="tab-content-p" style="display:none;">
+      <div id="stats-panel">
         <div style="color: #8b7355; text-align: center; padding: 20px;">
-          Waiting for DM to start...
+          Roll some dice to see stats
         </div>
       </div>
     </div>
@@ -174,5 +189,6 @@
   </div>
 
   <script src="./overlay-player.js"></script>
+  <script src="./stats-panel.js"></script>
 </body>
 </html>

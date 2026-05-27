@@ -98,4 +98,24 @@ function setupIpcListeners() {
 
 document.addEventListener('DOMContentLoaded', () => {
   setupIpcListeners();
+  setupTabs();
 });
+
+function setupTabs() {
+  document.querySelectorAll('.tab-button').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const tab = btn.getAttribute('data-tab');
+      document.querySelectorAll('.tab-button').forEach((b) => {
+        b.style.background = '#2a2520';
+        b.style.color = '#8b7355';
+        b.classList.remove('active');
+      });
+      btn.style.background = '#8b7355';
+      btn.style.color = '#0d0b08';
+      btn.classList.add('active');
+      document.querySelectorAll('.tab-content-p').forEach((c) => (c.style.display = 'none'));
+      const el = document.getElementById(`tab-${tab}`);
+      if (el) el.style.display = 'block';
+    });
+  });
+}

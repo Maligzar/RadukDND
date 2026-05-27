@@ -333,6 +333,60 @@ function getStatements(campaignDb) {
         (@session_id, @player_id, @dice_type, @raw_result, @modifier, @total,
          @action_label, @roll_type, @is_secret, @is_crit, @is_nat1, @source, @rolled_at)
     `),
+    getSessionStats: campaignDb.prepare(`
+      SELECT
+        COUNT(*)                                        AS total_rolls,
+        ROUND(AVG(total), 1)                            AS avg_roll,
+        MAX(total)                                      AS highest_roll,
+        MIN(total)                                      AS lowest_roll,
+        SUM(is_crit)                                    AS total_crits,
+        SUM(is_nat1)                                    AS total_nat1s,
+        ROUND(SUM(is_crit) * 100.0 / COUNT(*), 1)      AS crit_pct,
+        ROUND(SUM(is_nat1) * 100.0 / COUNT(*), 1)      AS nat1_pct
+      FROM rolls
+      WHERE session_id=? AND is_secret=0
+    `),
+    getRollDistribution: campaignDb.prepare(`
+      SELECT
+        SUM(CASE WHEN total BETWEEN  1 AND  5 THEN 1 ELSE 0 END) AS band_1_5,
+        SUM(CASE WHEN total BETWEEN  6 AND 10 THEN 1 ELSE 0 END) AS band_6_10,
+        SUM(CASE WHEN total BETWEEN 11 AND 15 THEN 1 ELSE 0 END) AS band_11_15,
+        SUM(CASE WHEN total BETWEEN 16 AND 20 THEN 1 ELSE 0 END) AS band_16_20,
+        SUM(CASE WHEN total > 20             THEN 1 ELSE 0 END) AS band_20plus
+      FROM rolls
+      WHERE session_id=? AND is_secret=0 AND dice_type LIKE '%d20%'
+    `),
+    getTopActions: campaignDb.prepare(`
+      SELECT action_label, COUNT(*) AS count, ROUND(AVG(total), 1) AS avg_total
+      FROM rolls
+      WHERE session_id=? AND is_secret=0 AND action_label IS NOT NULL
+      GROUP BY action_label
+      ORDER BY count DESC
+      LIMIT 8
+    `),
+    getRollsByType: campaignDb.prepare(`
+      SELECT roll_type, COUNT(*) AS count, ROUND(AVG(total), 1) AS avg_total
+      FROM rolls
+      WHERE session_id=? AND is_secret=0
+      GROUP BY roll_type
+      ORDER BY count DESC
+    `),
+    getPlayerStats: campaignDb.prepare(`
+      SELECT
+        r.player_id,
+        p.character_name,
+        COUNT(*)                   AS total_rolls,
+        ROUND(AVG(r.total), 1)     AS avg_roll,
+        MAX(r.total)               AS highest_roll,
+        SUM(r.is_crit)             AS crits,
+        SUM(r.is_nat1)             AS nat1s
+      FROM rolls r
+      LEFT JOIN players p ON r.player_id = p.id
+      WHERE r.session_id=? AND r.is_secret=0
+      GROUP BY r.player_id
+      ORDER BY total_rolls DESC
+    `),
+
     getPublicRolls: campaignDb.prepare(`
       SELECT r.*, p.character_name, p.player_name
       FROM rolls r LEFT JOIN players p ON r.player_id = p.id

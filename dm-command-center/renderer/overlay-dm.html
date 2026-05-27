@@ -151,6 +151,121 @@
     ::-webkit-scrollbar-thumb:hover {
       background: #a89968;
     }
+
+    /* ── Stats Panel ─────────────────────────────────── */
+    #stats-panel {
+      font-size: 11px;
+    }
+
+    .stats-section {
+      background: rgba(13,11,8,0.95);
+      border: 1px solid #8b7355;
+      border-radius: 4px;
+      padding: 8px;
+      margin-bottom: 8px;
+    }
+
+    .stats-section-title {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #8b7355;
+      margin-bottom: 6px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #3a3530;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px;
+    }
+
+    .stat-tile {
+      background: #2a2520;
+      border-radius: 3px;
+      padding: 6px;
+      text-align: center;
+    }
+
+    .stat-tile-val {
+      font-size: 18px;
+      font-weight: bold;
+      color: #d0af57;
+      line-height: 1.2;
+    }
+
+    .stat-tile-val.crit  { color: #ffcc00; }
+    .stat-tile-val.nat1  { color: #c44444; }
+    .stat-tile-val.high  { color: #4aaa4a; }
+
+    .stat-tile-key {
+      font-size: 9px;
+      color: #8b7355;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .dist-bar-row {
+      display: grid;
+      grid-template-columns: 40px 1fr 30px;
+      align-items: center;
+      gap: 4px;
+      margin: 4px 0;
+      font-size: 10px;
+    }
+
+    .dist-bar-label { color: #8b7355; text-align: right; }
+
+    .dist-bar-track {
+      background: #2a2520;
+      border-radius: 2px;
+      height: 10px;
+      overflow: hidden;
+    }
+
+    .dist-bar-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 0.4s ease;
+    }
+
+    .dist-bar-fill.low    { background: #c44444; }
+    .dist-bar-fill.mid    { background: #8b7355; }
+    .dist-bar-fill.good   { background: #4a8a4a; }
+    .dist-bar-fill.high   { background: #ffcc00; }
+    .dist-bar-fill.bonus  { background: #a78bfa; }
+
+    .dist-bar-count { color: #d0af57; font-size: 10px; }
+
+    .action-row {
+      display: grid;
+      grid-template-columns: 1fr 30px 36px;
+      gap: 4px;
+      padding: 3px 0;
+      border-bottom: 1px solid #2a2520;
+      font-size: 10px;
+    }
+
+    .action-row:last-child { border-bottom: none; }
+    .action-name { color: #d0af57; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .action-count { color: #8b7355; text-align: center; }
+    .action-avg   { color: #ffcc00; text-align: right; }
+
+    .player-row {
+      display: grid;
+      grid-template-columns: 1fr 28px 28px 28px;
+      gap: 4px;
+      padding: 3px 0;
+      border-bottom: 1px solid #2a2520;
+      font-size: 10px;
+    }
+
+    .player-row:last-child { border-bottom: none; }
+    .player-name  { color: #d0af57; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .player-avg   { color: #ffcc00; text-align: center; }
+    .player-crits { color: #ffcc00; text-align: center; }
+    .player-nat1s { color: #c44444; text-align: center; }
   </style>
 </head>
 <body>
@@ -169,7 +284,7 @@
     <div class="tab-bar">
       <button class="tab-button active" data-tab="rolls">Rolls</button>
       <button class="tab-button" data-tab="initiative">Initiative</button>
-      <button class="tab-button" data-tab="actions">Actions</button>
+      <button class="tab-button" data-tab="stats">Stats</button>
     </div>
 
     <div class="tab-content active" id="tab-rolls">
@@ -183,16 +298,19 @@
     </div>
 
     <div class="tab-content" id="tab-initiative">
-      <!-- initiative-tracker.html will be injected here -->
+      <!-- initiative-tracker.html injected here -->
     </div>
 
-    <div class="tab-content" id="tab-actions">
-      <div style="color: #8b7355; text-align: center; padding: 20px;">
-        Action options coming in Phase 13
+    <div class="tab-content" id="tab-stats">
+      <div id="stats-panel">
+        <div style="color: #8b7355; text-align: center; padding: 20px;">
+          Roll some dice to see stats
+        </div>
       </div>
     </div>
   </div>
 
   <script src="./overlay-dm.js"></script>
+  <script src="./stats-panel.js"></script>
 </body>
 </html>
