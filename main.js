@@ -26,7 +26,7 @@ let viewsCreated = false;
 let activeView   = 'ddb'; // 'ddb' | 'roll20'
 
 const HEADER_H  = 34;
-const DISCORD_H = 160;
+const DISCORD_H = 68;
 const SIDEBAR_W = 260;
 let discordStripH = DISCORD_H;
 
@@ -136,7 +136,10 @@ function createViews(role) {
 
   // Discord strip placeholder
   discordView = new BrowserView({
-    webPreferences: { contextIsolation: true, nodeIntegration: false },
+    webPreferences: {
+      preload: path.join(__dirname, 'preload-main.js'),
+      contextIsolation: true, nodeIntegration: false,
+    },
   });
   mainWindow.addBrowserView(discordView);
   discordView.webContents.loadFile(path.join(__dirname, 'renderer', 'discord-strip.html'));

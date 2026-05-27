@@ -20,24 +20,25 @@
 
   /* Session block (left) */
   .session-block {
-    padding: 8px 20px;
+    padding: 5px 16px;
     border-right: 1px solid #2a2018;
     display: flex;
     flex-direction: column;
     justify-content: center;
-    min-width: 130px;
+    min-width: 120px;
+    flex-shrink: 0;
   }
   .session-label {
     font-family: 'Cinzel', serif;
-    font-size: 8px;
+    font-size: 7px;
     color: #4a3820;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    margin-bottom: 2px;
+    margin-bottom: 1px;
   }
   .session-code {
     font-family: 'Cinzel', serif;
-    font-size: 18px;
+    font-size: 15px;
     font-weight: 700;
     color: #e8b84a;
     letter-spacing: 0.14em;
@@ -45,9 +46,9 @@
   }
   .session-timer {
     font-family: 'Courier New', monospace;
-    font-size: 10px;
+    font-size: 9px;
     color: #4a3820;
-    margin-top: 3px;
+    margin-top: 2px;
     letter-spacing: 0.06em;
   }
 
@@ -60,12 +61,12 @@
   }
 
   .player-slot {
-    padding: 6px 14px;
+    padding: 4px 12px;
     border-right: 1px solid #1e1810;
     display: flex;
     flex-direction: column;
     justify-content: center;
-    min-width: 110px;
+    min-width: 100px;
     transition: background 0.15s;
   }
   .player-slot.active { background: rgba(140,26,26,0.08); }
@@ -73,15 +74,15 @@
 
   .slot-label {
     font-family: 'Cinzel', serif;
-    font-size: 7px;
+    font-size: 6px;
     color: #3a2e1e;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    margin-bottom: 2px;
+    margin-bottom: 1px;
   }
   .slot-name {
     font-family: 'Cinzel', serif;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
     color: #c9b08a;
     letter-spacing: 0.06em;
@@ -90,20 +91,11 @@
     text-overflow: ellipsis;
   }
   .slot-sub {
-    font-size: 10px;
+    font-size: 9px;
     color: #4a3820;
-    margin-top: 1px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-  .slot-pip {
-    width: 5px; height: 5px;
-    border-radius: 50%;
-    background: #2a6a2a;
-    display: inline-block;
-    margin-right: 4px;
-    vertical-align: middle;
   }
 
   /* Stats bar (right) */
@@ -113,9 +105,10 @@
     gap: 0;
     margin-left: auto;
     border-left: 1px solid #2a2018;
+    flex-shrink: 0;
   }
   .stat-chip {
-    padding: 0 16px;
+    padding: 0 14px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -125,7 +118,7 @@
   }
   .chip-val {
     font-family: 'Cinzel', serif;
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 700;
     color: #c9b08a;
     line-height: 1.1;
@@ -135,7 +128,7 @@
   .chip-val.green{ color: #2a9a2a; }
   .chip-key {
     font-family: 'Cinzel', serif;
-    font-size: 7px;
+    font-size: 6px;
     color: #4a3820;
     letter-spacing: 0.1em;
     text-transform: uppercase;
@@ -143,7 +136,7 @@
   }
 
   .online-badge {
-    padding: 0 14px;
+    padding: 0 12px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -151,14 +144,14 @@
     height: 100%;
   }
   .online-pip {
-    width: 8px; height: 8px;
+    width: 7px; height: 7px;
     border-radius: 50%;
     background: #2a7a2a;
-    margin-bottom: 3px;
+    margin-bottom: 2px;
   }
   .online-label {
     font-family: 'Cinzel', serif;
-    font-size: 7px;
+    font-size: 6px;
     color: #2a7a2a;
     letter-spacing: 0.1em;
     text-transform: uppercase;
@@ -203,6 +196,7 @@
 
 <script>
   const api = window.electronAPI;
+  if (!api) { console.error('[discord-strip] electronAPI not available — preload missing'); }
 
   // ── Session timer ────────────────────────────────────────────
   let startMs = Date.now();
@@ -215,27 +209,25 @@
   }
   setInterval(tick, 1000);
 
-  // ── Receive session info from main ───────────────────────────
-  api.on('session:info', ({ sessionCode, characterName, playerName }) => {
-    document.getElementById('session-code').textContent = sessionCode || '—';
-    document.getElementById('slot-name-0').textContent  = characterName || '—';
-    document.getElementById('slot-sub-0').textContent   = playerName    || '—';
-    startMs = Date.now();
-  });
+  if (api) {
+    // ── Receive session info from main ─────────────────────────
+    api.on('session:info', ({ sessionCode, characterName, playerName }) => {
+      document.getElementById('session-code').textContent = sessionCode || '—';
+      document.getElementById('slot-name-0').textContent  = characterName || '—';
+      document.getElementById('slot-sub-0').textContent   = playerName    || '—';
+      startMs = Date.now();
+    });
 
-  // ── Receive stats updates ────────────────────────────────────
-  api.on('stats:update', ({ total_rolls, avg_roll, total_crits, total_nat1s, highest_roll }) => {
-    document.getElementById('stat-rolls').textContent = total_rolls ?? 0;
-    document.getElementById('stat-avg').textContent   = avg_roll   ?? '—';
-    document.getElementById('stat-crits').textContent = total_crits ?? 0;
-    document.getElementById('stat-nat1s').textContent = total_nat1s ?? 0;
-    document.getElementById('stat-high').textContent  = highest_roll ?? '—';
-  });
+    // ── Receive stats updates ──────────────────────────────────
+    api.on('stats:update', ({ total_rolls, avg_roll, total_crits, total_nat1s, highest_roll }) => {
+      document.getElementById('stat-rolls').textContent = total_rolls ?? 0;
+      document.getElementById('stat-avg').textContent   = avg_roll   ?? '—';
+      document.getElementById('stat-crits').textContent = total_crits ?? 0;
+      document.getElementById('stat-nat1s').textContent = total_nat1s ?? 0;
+      document.getElementById('stat-high').textContent  = highest_roll ?? '—';
+    });
+  }
 
-  // ── Roll event → flash stats ─────────────────────────────────
-  api.on('roll:display', () => {
-    // Stats will be pushed by main via stats:update after each roll
-  });
 </script>
 </body>
 </html>
