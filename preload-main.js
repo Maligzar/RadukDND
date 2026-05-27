@@ -16,6 +16,7 @@ const ALLOWED_SEND = new Set([
   'initiative:set-turn',
   'initiative:clear',
   'discord:resize',
+  'view:switch',
   'session:end',
   // Phase 10: window controls
   'window:exit',
@@ -40,6 +41,9 @@ const ALLOWED_RECEIVE = new Set([
   'roll:display',
   'hp:update',
   'initiative:sync',
+  'view:active',
+  'session:info',
+  'stats:update',
 ]);
 
 contextBridge.exposeInMainWorld('electronAPI', {

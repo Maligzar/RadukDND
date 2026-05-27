@@ -40,8 +40,55 @@
     color: #e8b84a;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    flex: 1;
     -webkit-app-region: no-drag;
+  }
+
+  /* View tabs */
+  .view-tabs {
+    display: flex;
+    align-items: stretch;
+    gap: 2px;
+    height: 100%;
+    margin-left: 12px;
+    -webkit-app-region: no-drag;
+  }
+  .view-tab {
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0 12px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #4a3c28;
+    cursor: pointer;
+    transition: color 0.12s, border-color 0.12s;
+    display: flex;
+    align-items: center;
+  }
+  .view-tab:hover { color: #a08060; }
+  .view-tab.active {
+    color: #e8b84a;
+    border-bottom-color: #c8922a;
+  }
+
+  /* Session code badge */
+  #session-badge {
+    font-family: 'Cinzel', serif;
+    font-size: 9px;
+    color: #4a3c28;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    flex: 1;
+    text-align: right;
+    padding-right: 8px;
+    -webkit-app-region: no-drag;
+  }
+  #session-badge span {
+    color: #c8922a;
+    letter-spacing: 0.14em;
   }
 
   /* Window controls */
@@ -90,6 +137,13 @@
 
   <span id="app-title">DND Virtual Table</span>
 
+  <div class="view-tabs" id="view-tabs" style="display:none;">
+    <button class="view-tab active" data-view="ddb"   onclick="switchView('ddb')">D&amp;D Beyond</button>
+    <button class="view-tab"        data-view="roll20" onclick="switchView('roll20')">Roll20</button>
+  </div>
+
+  <div id="session-badge"></div>
+
   <div class="win-controls">
     <!-- Minimize -->
     <button class="win-btn" title="Minimize"
@@ -124,6 +178,24 @@
 </div>
 
 <script>
+  function switchView(view) {
+    window.electronAPI.send('view:switch', { view });
+    document.querySelectorAll('.view-tab').forEach(t =>
+      t.classList.toggle('active', t.dataset.view === view)
+    );
+  }
+
+  window.electronAPI.on('view:active', ({ view, sessionCode }) => {
+    document.getElementById('view-tabs').style.display = 'flex';
+    document.querySelectorAll('.view-tab').forEach(t =>
+      t.classList.toggle('active', t.dataset.view === view)
+    );
+    if (sessionCode) {
+      document.getElementById('session-badge').innerHTML =
+        `Code: <span>${sessionCode}</span>`;
+    }
+  });
+
   function confirmExit() {
     if (confirm('Close DND Virtual Table?')) {
       window.electronAPI.send('window:exit');

@@ -23,6 +23,7 @@ let overlayView  = null;
 
 // Phase 10: guard against duplicate createViews() calls
 let viewsCreated = false;
+let activeView   = 'ddb'; // 'ddb' | 'roll20'
 
 const HEADER_H  = 34;
 const DISCORD_H = 160;
@@ -111,15 +112,12 @@ function layoutViews() {
   // Discord strip spans full width below the titlebar
   if (discordView) discordView.setBounds({ x: 0, y: HEADER_H, width: winW, height: discordStripH });
 
-  if (appRole === 'player') {
-    if (ddbView)     ddbView.setBounds({ x: 0, y: contentTop, width: mainW, height: contentH });
-    if (overlayView) overlayView.setBounds({ x: mainW, y: HEADER_H, width: SIDEBAR_W, height: sidebarH });
-    if (roll20View)  roll20View.setBounds({ x: 0, y: 0, width: 0, height: 0 });
-  } else if (appRole === 'dm') {
-    if (roll20View)  roll20View.setBounds({ x: 0, y: contentTop, width: mainW, height: contentH });
-    if (overlayView) overlayView.setBounds({ x: mainW, y: HEADER_H, width: SIDEBAR_W, height: sidebarH });
-    if (ddbView)     ddbView.setBounds({ x: 0, y: 0, width: 0, height: 0 });
-  }
+  const showBounds = { x: 0, y: contentTop, width: mainW, height: contentH };
+  const hideBounds = { x: 0, y: 0, width: 0, height: 0 };
+
+  if (ddbView)     ddbView.setBounds(activeView === 'ddb'    ? showBounds : hideBounds);
+  if (roll20View)  roll20View.setBounds(activeView === 'roll20' ? showBounds : hideBounds);
+  if (overlayView) overlayView.setBounds({ x: mainW, y: HEADER_H, width: SIDEBAR_W, height: sidebarH });
 
   // Keep titlebar on top after every layout
   layoutTitlebar();
@@ -178,7 +176,20 @@ function createViews(role) {
       : path.join(__dirname, 'renderer', 'overlay-player.html')
   );
 
+  // Default active view per role; tell the titlebar to show tabs
+  activeView = role === 'dm' ? 'roll20' : 'ddb';
   layoutViews();
+  setTimeout(() => {
+    titlebarView?.webContents.send('view:active', {
+      view: activeView,
+      sessionCode: activeSession?.code ?? null,
+    });
+    discordView?.webContents.send('session:info', {
+      sessionCode:   activeSession?.code ?? null,
+      characterName: activeSession?.characterName ?? null,
+      playerName:    activeSession?.playerName    ?? null,
+    });
+  }, 500);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -247,6 +258,8 @@ function registerIpcHandlers() {
       rolled_at: payload.rolled_at ?? Date.now(),
     };
     db.insertRoll.run(roll);
+    const stats = db.getSessionStats.get(activeSession.id);
+    discordView?.webContents.send('stats:update', stats);
     if (roll.is_secret) return;
     if (overlayView) {
       overlayView.webContents.send('roll:display', {
@@ -308,6 +321,13 @@ function registerIpcHandlers() {
       distribution: db.getRollDistribution.get(id),
       topActions:   db.getTopActions.all(id),
     };
+  });
+
+  // ── View tab switching ─────────────────────────────────────
+  ipcMain.on('view:switch', (_, { view }) => {
+    if (!viewsCreated) return;
+    activeView = view;
+    layoutViews();
   });
 
   // ── Discord strip resize ───────────────────────────────────

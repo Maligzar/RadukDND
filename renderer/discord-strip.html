@@ -2,30 +2,240 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
+
   body {
     background: #0f0d0a;
+    color: #c9b08a;
+    font-family: 'IM Fell English', Georgia, serif;
+    height: 100vh;
+    display: flex;
+    align-items: stretch;
+    border-bottom: 1px solid #4a3c28;
+    overflow: hidden;
+  }
+
+  /* Session block (left) */
+  .session-block {
+    padding: 8px 20px;
+    border-right: 1px solid #2a2018;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 130px;
+  }
+  .session-label {
+    font-family: 'Cinzel', serif;
+    font-size: 8px;
+    color: #4a3820;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+  .session-code {
+    font-family: 'Cinzel', serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: #e8b84a;
+    letter-spacing: 0.14em;
+    line-height: 1;
+  }
+  .session-timer {
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    color: #4a3820;
+    margin-top: 3px;
+    letter-spacing: 0.06em;
+  }
+
+  /* Party slots */
+  .party-row {
+    display: flex;
+    align-items: stretch;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .player-slot {
+    padding: 6px 14px;
+    border-right: 1px solid #1e1810;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 110px;
+    transition: background 0.15s;
+  }
+  .player-slot.active { background: rgba(140,26,26,0.08); }
+  .player-slot.empty  { opacity: 0.3; }
+
+  .slot-label {
+    font-family: 'Cinzel', serif;
+    font-size: 7px;
+    color: #3a2e1e;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+  .slot-name {
+    font-family: 'Cinzel', serif;
+    font-size: 12px;
+    font-weight: 600;
+    color: #c9b08a;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .slot-sub {
+    font-size: 10px;
+    color: #4a3820;
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .slot-pip {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: #2a6a2a;
+    display: inline-block;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+
+  /* Stats bar (right) */
+  .stats-bar {
     display: flex;
     align-items: center;
-    justify-content: center;
-    height: 100vh;
-    border-bottom: 1px solid #4a3c28;
-    gap: 12px;
+    gap: 0;
+    margin-left: auto;
+    border-left: 1px solid #2a2018;
   }
-  svg { opacity: 0.4; }
-  span {
-    font-family: 'Courier New', monospace;
-    font-size: 11px;
+  .stat-chip {
+    padding: 0 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid #1e1810;
+    height: 100%;
+  }
+  .chip-val {
+    font-family: 'Cinzel', serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: #c9b08a;
+    line-height: 1.1;
+  }
+  .chip-val.gold { color: #ffd100; }
+  .chip-val.red  { color: #cc2a2a; }
+  .chip-val.green{ color: #2a9a2a; }
+  .chip-key {
+    font-family: 'Cinzel', serif;
+    font-size: 7px;
     color: #4a3820;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-top: 1px;
+  }
+
+  .online-badge {
+    padding: 0 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+  }
+  .online-pip {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #2a7a2a;
+    margin-bottom: 3px;
+  }
+  .online-label {
+    font-family: 'Cinzel', serif;
+    font-size: 7px;
+    color: #2a7a2a;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
   }
 </style>
 </head>
 <body>
-  <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
-    <circle cx="10" cy="10" r="8" fill="#5865F2" opacity="0.6"/>
-  </svg>
-  <span>DISCORD — USE SECOND MONITOR</span>
+
+<!-- Session -->
+<div class="session-block">
+  <div class="session-label">Session</div>
+  <div class="session-code" id="session-code">—</div>
+  <div class="session-timer" id="session-timer">00:00:00</div>
+</div>
+
+<!-- Party slots (populated by JS) -->
+<div class="party-row" id="party-row">
+  <div class="player-slot active" id="slot-0">
+    <div class="slot-label">Player</div>
+    <div class="slot-name" id="slot-name-0">—</div>
+    <div class="slot-sub"  id="slot-sub-0">—</div>
+  </div>
+  <div class="player-slot empty" id="slot-1"><div class="slot-label">Player</div><div class="slot-name">—</div><div class="slot-sub">—</div></div>
+  <div class="player-slot empty" id="slot-2"><div class="slot-label">Player</div><div class="slot-name">—</div><div class="slot-sub">—</div></div>
+  <div class="player-slot empty" id="slot-3"><div class="slot-label">Player</div><div class="slot-name">—</div><div class="slot-sub">—</div></div>
+  <div class="player-slot empty" id="slot-4"><div class="slot-label">Player</div><div class="slot-name">—</div><div class="slot-sub">—</div></div>
+  <div class="player-slot empty" id="slot-5"><div class="slot-label">Player</div><div class="slot-name">—</div><div class="slot-sub">—</div></div>
+</div>
+
+<!-- Live stats -->
+<div class="stats-bar">
+  <div class="stat-chip"><div class="chip-val" id="stat-rolls">0</div><div class="chip-key">Rolls</div></div>
+  <div class="stat-chip"><div class="chip-val" id="stat-avg">—</div><div class="chip-key">Avg</div></div>
+  <div class="stat-chip"><div class="chip-val gold" id="stat-crits">0</div><div class="chip-key">Crits</div></div>
+  <div class="stat-chip"><div class="chip-val red"  id="stat-nat1s">0</div><div class="chip-key">Nat 1s</div></div>
+  <div class="stat-chip"><div class="chip-val green" id="stat-high">—</div><div class="chip-key">High</div></div>
+  <div class="online-badge">
+    <div class="online-pip" id="online-pip"></div>
+    <div class="online-label" id="online-label">Local</div>
+  </div>
+</div>
+
+<script>
+  const api = window.electronAPI;
+
+  // ── Session timer ────────────────────────────────────────────
+  let startMs = Date.now();
+  function tick() {
+    const s = Math.floor((Date.now() - startMs) / 1000);
+    const hh = String(Math.floor(s / 3600)).padStart(2, '0');
+    const mm = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+    const ss = String(s % 60).padStart(2, '0');
+    document.getElementById('session-timer').textContent = `${hh}:${mm}:${ss}`;
+  }
+  setInterval(tick, 1000);
+
+  // ── Receive session info from main ───────────────────────────
+  api.on('session:info', ({ sessionCode, characterName, playerName }) => {
+    document.getElementById('session-code').textContent = sessionCode || '—';
+    document.getElementById('slot-name-0').textContent  = characterName || '—';
+    document.getElementById('slot-sub-0').textContent   = playerName    || '—';
+    startMs = Date.now();
+  });
+
+  // ── Receive stats updates ────────────────────────────────────
+  api.on('stats:update', ({ total_rolls, avg_roll, total_crits, total_nat1s, highest_roll }) => {
+    document.getElementById('stat-rolls').textContent = total_rolls ?? 0;
+    document.getElementById('stat-avg').textContent   = avg_roll   ?? '—';
+    document.getElementById('stat-crits').textContent = total_crits ?? 0;
+    document.getElementById('stat-nat1s').textContent = total_nat1s ?? 0;
+    document.getElementById('stat-high').textContent  = highest_roll ?? '—';
+  });
+
+  // ── Roll event → flash stats ─────────────────────────────────
+  api.on('roll:display', () => {
+    // Stats will be pushed by main via stats:update after each roll
+  });
+</script>
 </body>
 </html>
