@@ -7,11 +7,18 @@
     "start": "electron .",
     "dev": "electron . --dev"
   },
-  "keywords": ["dnd", "roll20", "dndbeyond", "discord", "electron"],
+  "keywords": [
+    "dnd",
+    "roll20",
+    "dndbeyond",
+    "discord",
+    "electron"
+  ],
   "author": "Raduk",
   "license": "MIT",
   "dependencies": {
-    "better-sqlite3": "^9.4.3"
+    "better-sqlite3": "^9.4.3",
+    "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
     "electron": "^29.1.0"

@@ -3,6 +3,7 @@
 const { app, BrowserWindow, ipcMain, WebContentsView } = require('electron');
 const path = require('path');
 const { openCampaignDb, openBestiaryDb, getStatements } = require('./db/db-init');
+const relay = require('./relay-client');
 
 // ─────────────────────────────────────────────────────────────
 // State
@@ -42,6 +43,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  relay.disconnect();
   if (campaignDb) campaignDb.close();
   // bestiaryDb is read-only, SQLite closes it safely on process exit
 });
@@ -196,6 +198,10 @@ function registerIpcHandlers() {
     }
 
     createViews(role);
+
+    relay.joinSession(activeSession.code, role, role === 'dm' ? playerName : null);
+    setupRelayListeners();
+
     return { ok: true, session: activeSession };
   });
 
@@ -227,8 +233,8 @@ function registerIpcHandlers() {
     // Push to overlay
     overlayView?.webContents.send('roll:display', roll);
 
-    // TODO Phase 11: emit to relay via Socket.io
-    // relaySocket?.emit('roll:broadcast', roll);
+    // Broadcast to relay
+    relay.broadcastRoll(roll);
   });
 
   // ── HP update (from preload-r20.js, DM only) ────────────
@@ -241,7 +247,7 @@ function registerIpcHandlers() {
     `).run(hp_current, activeSession.id, combatant_name);
 
     overlayView?.webContents.send('hp:update', { combatant_name, hp_current });
-    // TODO Phase 11: relay to players
+    relay.broadcastHpUpdate(combatant_name, hp_current);
   });
 
   // ── Initiative ───────────────────────────────────────────
@@ -253,17 +259,17 @@ function registerIpcHandlers() {
   ipcMain.on('initiative:set-turn', (_, { id }) => {
     if (!activeSession || appRole !== 'dm') return;
     db.setActiveTurn.run({ id, session_id: activeSession.id });
-    overlayView?.webContents.send('initiative:sync',
-      db.getInitiative.all(activeSession.id)
-    );
+    const combatants = db.getInitiative.all(activeSession.id);
+    overlayView?.webContents.send('initiative:sync', combatants);
+    relay.broadcastInitiativeSync(combatants);
   });
 
   ipcMain.handle('initiative:add-combatant', (_, combatant) => {
     if (!activeSession || appRole !== 'dm') return { ok: false };
     const info = db.upsertCombatant.run({ ...combatant, session_id: activeSession.id });
-    overlayView?.webContents.send('initiative:sync',
-      db.getInitiative.all(activeSession.id)
-    );
+    const combatants = db.getInitiative.all(activeSession.id);
+    overlayView?.webContents.send('initiative:sync', combatants);
+    relay.broadcastInitiativeSync(combatants);
     return { ok: true, id: info.lastInsertRowid };
   });
 
@@ -271,6 +277,7 @@ function registerIpcHandlers() {
     if (!activeSession || appRole !== 'dm') return;
     db.clearInitiative.run(activeSession.id);
     overlayView?.webContents.send('initiative:sync', []);
+    relay.broadcastInitiativeSync([]);
   });
 
   // ── Rolls — query for overlay ────────────────────────────
@@ -340,6 +347,31 @@ function registerIpcHandlers() {
     if (!activeSession || appRole !== 'dm') return;
     db.endSession.run({ id: activeSession.id, ended_at: Date.now() });
     activeSession = null;
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// Relay event listeners
+// ─────────────────────────────────────────────────────────────
+function setupRelayListeners() {
+  relay.onRollBroadcast((roll) => {
+    overlayView?.webContents.send('roll:display', roll);
+  });
+
+  relay.onHpUpdate(({ combatant_name, hp_current }) => {
+    overlayView?.webContents.send('hp:update', { combatant_name, hp_current });
+  });
+
+  relay.onInitiativeSync((combatants) => {
+    overlayView?.webContents.send('initiative:sync', combatants);
+  });
+
+  relay.onPlayerJoined(() => {
+    console.log('[Relay] Player joined session');
+  });
+
+  relay.onPlayerLeft(() => {
+    console.log('[Relay] Player left session');
   });
 }
 
