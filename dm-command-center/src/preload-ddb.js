@@ -1,36 +1,75 @@
 'use strict';
 
-// preload-ddb.js
-// ─────────────────────────────────────────────────────────────────────────────
-// This script runs INSIDE the D&D Beyond WebContentsView, in an isolated world.
-// It watches for roll events and tunnels them to main.js via ipcRenderer.
-//
-// Strategy: DDB triggers rolls via custom DOM events and visible dice roll
-// result popups. We intercept both layers for maximum coverage.
-// ─────────────────────────────────────────────────────────────────────────────
-
 const { ipcRenderer } = require('electron');
+
+// Parse current character ID from the URL so we can ignore other party
+// members' roll notifications that appear on the same page.
+function getCharacterIdFromUrl() {
+  const m = window.location.pathname.match(/\/characters\/(\d+)/i);
+  return m ? m[1] : null;
+}
+
+let currentCharacterId = getCharacterIdFromUrl();
+
+// Re-check on SPA navigation
+const _pushState = history.pushState.bind(history);
+history.pushState = function (...args) {
+  _pushState(...args);
+  currentCharacterId = getCharacterIdFromUrl();
+};
+window.addEventListener('popstate', () => {
+  currentCharacterId = getCharacterIdFromUrl();
+});
+
+// Build a normalised payload matching the roll:captured schema in main.js
+function buildPayload({ expression, result, label, isCrit, isFumble }) {
+  const exprMatch = expression.match(/^([\dd+\-*]+?)([+\-]\d+)?$/i);
+  const dice_type = exprMatch ? exprMatch[1].trim() : expression;
+  const modifier  = exprMatch && exprMatch[2] ? parseInt(exprMatch[2], 10) : 0;
+
+  return {
+    player_id:    currentCharacterId ?? null,
+    dice_type,
+    raw_result:   String(result),
+    modifier,
+    total:        typeof result === 'number' ? result : (parseInt(result, 10) || 0),
+    action_label: label ?? null,
+    roll_type:    'check',
+    is_secret:    false,
+    is_crit:      isCrit   ?? false,
+    is_nat1:      isFumble ?? false,
+    rolled_at:    Date.now(),
+  };
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LAYER 1: DOM Event Interception
 // D&D Beyond dispatches custom events on the document when a roll happens.
-// These event names were discovered by inspecting DDB's JS bundle.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const DDB_ROLL_EVENTS = [
-  'DDB.Dice.Roll',       // Primary dice roll event
-  'DDB.Dice.RollResult', // Final result (after animation)
+  'DDB.Dice.Roll',
+  'DDB.Dice.RollResult',
 ];
 
 function parseDDBRollEvent(event) {
   try {
     const d = event.detail ?? event.data ?? {};
+
+    // If the event includes a character entity ID that doesn't match the
+    // current character, this is a party notification — skip it.
+    const entityId = String(d.entityId ?? d.characterId ?? d.entity_id ?? '');
+    if (entityId && currentCharacterId && entityId !== currentCharacterId) return null;
+
+    const result = d.result ?? d.total ?? null;
+    if (result === null) return null;
+
     return {
       expression: d.diceExpression ?? d.rollExpression ?? d.expression ?? '?',
-      result:     d.result         ?? d.total           ?? null,
-      label:      d.context        ?? d.label            ?? d.rollType ?? null,
-      isCrit:     !!(d.isCritical  ?? d.criticalHit),
-      isFumble:   !!(d.isFumble    ?? d.criticalFail),
+      result,
+      label:    d.context   ?? d.label   ?? d.rollType ?? null,
+      isCrit:   !!(d.isCritical  ?? d.criticalHit),
+      isFumble: !!(d.isFumble    ?? d.criticalFail),
     };
   } catch {
     return null;
@@ -42,19 +81,17 @@ for (const eventName of DDB_ROLL_EVENTS) {
     const roll = parseDDBRollEvent(event);
     if (roll) {
       console.log('[DM:DDB] Roll event captured:', roll);
-      ipcRenderer.send('ddb:roll-detected', roll);
+      ipcRenderer.send('roll:captured', buildPayload(roll));
     }
-  }, true); // useCapture = true so we grab it before DDB's handlers
+  }, true);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LAYER 2: MutationObserver on the dice result popup
-// As a fallback, watch for the result tooltip/modal that DDB renders
-// after every dice roll. Parse the result text from the DOM.
+// Fallback: watches for the result tooltip DDB renders after each roll.
+// Skips popups that belong to other party members.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// These selectors target the DDB dice roll result overlay.
-// They may need updating if DDB changes their markup.
 const RESULT_SELECTORS = {
   container: '[class*="dice-roll-result"]',
   total:     '[class*="dice-roll-result__total"]',
@@ -62,10 +99,28 @@ const RESULT_SELECTORS = {
   detail:    '[class*="dice-roll-result__dice-detail"]',
 };
 
-let lastReportedResult = null; // Debounce identical results
+// Containers that identify a roll as belonging to another party member
+const PARTY_SELECTORS = [
+  '[class*="party-member"]',
+  '[class*="PlayerName"]',
+  '[class*="player-name"]',
+  '[class*="character-name"]',
+  '[class*="notification"]',
+  '[class*="toast"]',
+];
+
+let lastReportedResult = null;
+
+function isPartyNotification(node) {
+  return PARTY_SELECTORS.some(
+    (sel) => node.closest(sel) !== null || node.querySelector(sel) !== null
+  );
+}
 
 function extractRollFromPopup(node) {
   try {
+    if (isPartyNotification(node)) return null;
+
     const totalEl  = node.querySelector(RESULT_SELECTORS.total);
     const typeEl   = node.querySelector(RESULT_SELECTORS.type);
     const detailEl = node.querySelector(RESULT_SELECTORS.detail);
@@ -78,10 +133,9 @@ function extractRollFromPopup(node) {
     const label      = typeEl?.textContent.trim() ?? null;
     const detailText = detailEl?.textContent.trim() ?? '';
 
-    // Attempt to reconstruct expression from the detail text
-    // DDB shows something like "d20 + 5 = 20"
+    // DDB shows detail like "d20 + 5 = 20"
     const expressionMatch = detailText.match(/^([d0-9+\-\s]+)=/i);
-    const expression      = expressionMatch
+    const expression = expressionMatch
       ? expressionMatch[1].trim().replace(/\s+/g, '')
       : '1d20';
 
@@ -101,7 +155,6 @@ const observer = new MutationObserver((mutations) => {
     for (const node of mutation.addedNodes) {
       if (!(node instanceof HTMLElement)) continue;
 
-      // Check if this node IS a result container, or CONTAINS one
       const target = node.matches(RESULT_SELECTORS.container)
         ? node
         : node.querySelector(RESULT_SELECTORS.container);
@@ -111,19 +164,18 @@ const observer = new MutationObserver((mutations) => {
       const roll = extractRollFromPopup(target);
       if (!roll) continue;
 
-      // Debounce: skip if same result reported within 500ms
+      // Debounce: skip duplicate results within 500ms
       const key = `${roll.expression}:${roll.result}`;
       if (key === lastReportedResult) continue;
       lastReportedResult = key;
       setTimeout(() => { lastReportedResult = null; }, 500);
 
       console.log('[DM:DDB] Popup roll captured:', roll);
-      ipcRenderer.send('ddb:roll-detected', roll);
+      ipcRenderer.send('roll:captured', buildPayload(roll));
     }
   }
 });
 
-// Start observing once the DOM is ready
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', startObserver);
 } else {
@@ -131,35 +183,30 @@ if (document.readyState === 'loading') {
 }
 
 function startObserver() {
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true,
-  });
-  console.log('[DM:DDB] Preload active. Watching for dice rolls...');
+  observer.observe(document.body, { childList: true, subtree: true });
+  console.log('[DM:DDB] Preload active. Character ID:', currentCharacterId ?? 'unknown (navigate to character sheet)');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LAYER 3: XHR/Fetch Intercept (optional deep integration)
-// DDB hits their own API when processing rolls. Intercepting this gives us
-// the cleanest, most reliable roll data — no DOM parsing needed.
+// LAYER 3: Fetch Intercept
+// Cleanest source — DDB API responses include character attribution.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ROLL_API_PATTERN = /\/api\/dice\/roll|\/dice-roll/i;
 
-// Intercept fetch
 const originalFetch = window.fetch;
 window.fetch = async function (...args) {
   const response = await originalFetch.apply(this, args);
 
   try {
-    const url = typeof args[0] === 'string' ? args[0] : args[0]?.url ?? '';
+    const url = typeof args[0] === 'string' ? args[0] : (args[0]?.url ?? '');
     if (ROLL_API_PATTERN.test(url)) {
       const clone = response.clone();
       clone.json().then((data) => {
         const roll = parseAPIRollData(data);
         if (roll) {
           console.log('[DM:DDB] API roll intercepted:', roll);
-          ipcRenderer.send('ddb:roll-detected', roll);
+          ipcRenderer.send('roll:captured', buildPayload(roll));
         }
       }).catch(() => {});
     }
@@ -170,15 +217,21 @@ window.fetch = async function (...args) {
 
 function parseAPIRollData(data) {
   try {
-    // DDB API response shape — may vary; update if needed
-    const rolls  = data?.data?.diceRolls ?? data?.rolls ?? [];
+    // Check character attribution — skip if this API response belongs to
+    // another character (e.g., party sync endpoint)
+    const entityId = String(data?.data?.characterId ?? data?.entityId ?? '');
+    if (entityId && currentCharacterId && entityId !== currentCharacterId) return null;
+
+    const rolls = data?.data?.diceRolls ?? data?.rolls ?? [];
     if (!rolls.length) return null;
 
-    const roll    = rolls[0];
-    const result  = roll?.total ?? roll?.result ?? null;
-    const expr    = roll?.diceExpression ?? roll?.expression ?? '?';
-    const isCrit  = !!(roll?.isCritical || data?.data?.isCritical);
-    const label   = data?.data?.context ?? data?.context ?? null;
+    const roll   = rolls[0];
+    const result = roll?.total ?? roll?.result ?? null;
+    if (result === null) return null;
+
+    const expr   = roll?.diceExpression ?? roll?.expression ?? '?';
+    const isCrit = !!(roll?.isCritical || data?.data?.isCritical);
+    const label  = data?.data?.context ?? data?.context ?? null;
 
     return { expression: expr, result, label, isCrit, isFumble: false };
   } catch {

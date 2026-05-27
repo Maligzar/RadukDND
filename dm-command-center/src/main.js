@@ -365,7 +365,8 @@ function registerIpcHandlers() {
 // ─────────────────────────────────────────────────────────────
 function setupRelayListeners() {
   relay.onRollBroadcast((roll) => {
-    overlayView?.webContents.send('roll:display', roll);
+    // Tag as remote so the overlay can show player attribution
+    overlayView?.webContents.send('roll:display', { ...roll, _fromRelay: true });
   });
 
   relay.onHpUpdate(({ combatant_name, hp_current }) => {

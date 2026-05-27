@@ -30,11 +30,14 @@ function renderRolls() {
       const isFail = roll.is_nat1 ? 'fail' : '';
       const label = roll.action_label || 'Roll';
       const timestamp = new Date(roll.rolled_at).toLocaleTimeString();
+      const fromPlayer = roll._fromRelay && roll.player_id
+        ? `<span style="color:#8b7355;font-size:10px;">${roll.player_id}</span> `
+        : '';
 
       return `
         <div class="roll-item ${isCrit} ${isFail}">
           <div>
-            <span class="roll-label">${label}</span>
+            ${fromPlayer}<span class="roll-label">${label}</span>
             <span class="roll-value">${roll.total}</span>
           </div>
           <div class="roll-meta">
