@@ -243,11 +243,214 @@
     .log-row .log-result { color: var(--text); font-weight: bold; text-align: right; }
     .log-row .log-expr   { color: var(--accent); }
     .log-row .log-time   { color: var(--muted); font-size: 9px; }
-    .log-row.is-crit    { background: rgba(245,158,11,0.06); }
-    .log-row.is-fumble  { background: rgba(239,68,68,0.06); }
+  <style>
+    /* Role Picker Modal */
+    #role-picker {
+      display: flex;
+      position: fixed;
+      inset: 0;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.8);
+      z-index: 10000;
+      font-family: var(--font-mono);
+    }
+
+    .role-picker-box {
+      background: var(--surface);
+      border: 2px solid var(--accent);
+      border-radius: 8px;
+      padding: 24px;
+      max-width: 500px;
+      width: 90%;
+      -webkit-app-region: no-drag;
+    }
+
+    .role-picker-box h2 {
+      color: var(--accent);
+      font-size: 20px;
+      margin-bottom: 16px;
+      text-align: center;
+      letter-spacing: 0.05em;
+    }
+
+    .role-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .role-btn {
+      padding: 12px;
+      border: 2px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg);
+      color: var(--text);
+      cursor: pointer;
+      font-family: var(--font-mono);
+      font-size: 14px;
+      font-weight: bold;
+      transition: all 0.2s;
+    }
+
+    .role-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      transform: scale(1.02);
+    }
+
+    .role-btn.active {
+      background: var(--accent);
+      color: var(--bg);
+      border-color: var(--accent);
+    }
+
+    .role-form {
+      display: none;
+      margin-top: 16px;
+      border-top: 1px solid var(--border);
+      padding-top: 16px;
+    }
+
+    .role-form.active { display: block; }
+
+    .form-group {
+      margin-bottom: 12px;
+    }
+
+    .form-group label {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      box-sizing: border-box;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(167,139,250,0.2);
+    }
+
+    .form-buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-submit {
+      flex: 1;
+      padding: 10px;
+      background: var(--success);
+      color: #000;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+      font-family: var(--font-mono);
+    }
+
+    .btn-submit:hover {
+      opacity: 0.9;
+    }
+
+    .btn-cancel {
+      padding: 10px;
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: var(--font-mono);
+    }
+
+    .btn-cancel:hover {
+      color: var(--text);
+      border-color: var(--text);
+    }
+
+    .session-code-display {
+      background: var(--bg);
+      border: 1px solid var(--accent);
+      border-radius: 4px;
+      padding: 8px;
+      margin: 8px 0;
+      text-align: center;
+    }
+
+    .session-code-display strong {
+      color: var(--crit);
+      font-size: 16px;
+      letter-spacing: 0.1em;
+    }
+
+    .session-code-copy {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
   </style>
 </head>
 <body>
+  <!-- Role Picker Modal -->
+  <div id="role-picker">
+    <div class="role-picker-box">
+      <h2>⚔ Choose Your Role</h2>
+
+      <div class="role-buttons">
+        <button class="role-btn" data-role="dm">
+          🐉 Dungeon Master
+        </button>
+        <button class="role-btn" data-role="player">
+          🗡️ Player
+        </button>
+      </div>
+
+      <!-- DM Form -->
+      <div class="role-form" data-role="dm">
+        <div class="form-group">
+          <label>Dungeon Master Name</label>
+          <input type="text" id="dm-name" placeholder="Your name" value="Dungeon Master" />
+        </div>
+        <div class="form-group">
+          <label>Party Level</label>
+          <input type="number" id="party-level" placeholder="Average party level" value="5" min="1" max="20" />
+        </div>
+        <div class="form-group">
+          <label>Party Size</label>
+          <input type="number" id="party-size" placeholder="Number of PCs" value="4" min="1" max="10" />
+        </div>
+        <div class="form-buttons">
+          <button class="btn-submit" id="btn-create-session">Create Session</button>
+        </div>
+      </div>
+
+      <!-- Player Form -->
+      <div class="role-form" data-role="player">
+        <div class="form-group">
+          <label>Session Code (from DM)</label>
+          <input type="text" id="session-code" placeholder="e.g., ABC123" maxlength="6" />
+        </div>
+        <div class="form-buttons">
+          <button class="btn-submit" id="btn-join-session">Join Session</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="toolbar">
 
     <div class="logo">⚔ ELMINSTER <span>DM CMD v1.0</span></div>
@@ -309,6 +512,7 @@
     <div id="hotkey-list"></div>
   </div>
 
+  <script src="role-picker.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>
