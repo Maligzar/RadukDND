@@ -134,6 +134,20 @@ function createViews(role) {
   }
   viewsCreated = true;
 
+  // Overlay sidebar (add first so content views are on top)
+  overlayView = new BrowserView({
+    webPreferences: {
+      preload: path.join(__dirname, 'preload-main.js'),
+      contextIsolation: true, nodeIntegration: false,
+    },
+  });
+  mainWindow.addBrowserView(overlayView);
+  overlayView.webContents.loadFile(
+    role === 'dm'
+      ? path.join(__dirname, 'renderer', 'overlay-dm.html')
+      : path.join(__dirname, 'renderer', 'overlay-player.html')
+  );
+
   // Discord strip placeholder
   discordView = new BrowserView({
     webPreferences: {
@@ -164,20 +178,6 @@ function createViews(role) {
   });
   mainWindow.addBrowserView(roll20View);
   roll20View.webContents.loadURL('https://app.roll20.net');
-
-  // Overlay sidebar
-  overlayView = new BrowserView({
-    webPreferences: {
-      preload: path.join(__dirname, 'preload-main.js'),
-      contextIsolation: true, nodeIntegration: false,
-    },
-  });
-  mainWindow.addBrowserView(overlayView);
-  overlayView.webContents.loadFile(
-    role === 'dm'
-      ? path.join(__dirname, 'renderer', 'overlay-dm.html')
-      : path.join(__dirname, 'renderer', 'overlay-player.html')
-  );
 
   // Default active view per role; tell the titlebar to show tabs
   activeView = role === 'dm' ? 'roll20' : 'ddb';
