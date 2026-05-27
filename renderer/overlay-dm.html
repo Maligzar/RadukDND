@@ -169,6 +169,52 @@
   }
   .add-submit:hover { background: #b02020; }
 
+  /* Stats */
+  .stats-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 1px; background: rgba(74,60,40,0.2);
+    border-bottom: 1px solid rgba(74,60,40,0.25);
+  }
+  .stat-cell {
+    background: #161210; padding: 6px 8px;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .stat-val {
+    font-family: 'Cinzel', serif; font-size: 17px; font-weight: 700;
+    color: #c9b08a; line-height: 1.1;
+  }
+  .stat-val.gold  { color: #ffd100; }
+  .stat-val.red   { color: #cc2a2a; }
+  .stat-val.green { color: #2a9a2a; }
+  .stat-key {
+    font-family: 'Cinzel', serif; font-size: 8px;
+    color: #705a3a; letter-spacing: 0.1em; text-transform: uppercase; margin-top: 1px;
+  }
+  .dist-row {
+    display: grid; grid-template-columns: 32px 1fr 20px;
+    align-items: center; gap: 5px; padding: 3px 8px;
+    border-bottom: 1px solid rgba(74,60,40,0.15);
+  }
+  .dist-label { font-family: 'Cinzel', serif; font-size: 9px; color: #705a3a; text-align: right; }
+  .dist-track { height: 6px; background: #1e1916; border: 1px solid rgba(74,60,40,0.4); border-radius: 1px; overflow: hidden; }
+  .dist-fill { height: 100%; border-radius: 1px; transition: width 0.4s ease; }
+  .dist-fill.low  { background: #8c1a1a; }
+  .dist-fill.mid  { background: #705a3a; }
+  .dist-fill.good { background: #3a7a3a; }
+  .dist-fill.high { background: #c8922a; }
+  .dist-fill.crit { background: #ffd100; }
+  .dist-count { font-family: 'Cinzel', serif; font-size: 9px; color: #705a3a; text-align: right; }
+  .stats-empty {
+    padding: 10px; text-align: center; font-family: 'Cinzel', serif;
+    font-size: 10px; color: #3a2e1e; letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .stats-toggle {
+    background: none; border: none; color: #705a3a;
+    cursor: pointer; font-family: 'Cinzel', serif; font-size: 10px;
+    padding: 0 2px; transition: color 0.12s; flex-shrink: 0;
+  }
+  .stats-toggle:hover { color: #c8922a; }
+
   /* Status bar */
   #status-bar {
     padding: 4px 8px; background: #0d0b08;
@@ -197,6 +243,18 @@
 
 <div class="scroll-body" id="roll-log" style="flex:1.4;">
   <div class="empty-state" id="roll-empty">Awaiting first roll...</div>
+</div>
+
+<div class="divider"></div>
+
+<!-- Session stats panel -->
+<div class="panel-hdr neutral" id="stats-hdr" style="cursor:pointer;" title="Toggle stats">
+  <div class="gem gold"></div>
+  <span class="panel-title">Session Stats</span>
+  <button class="stats-toggle" id="stats-chevron">▲</button>
+</div>
+<div id="stats-body" style="flex-shrink:0;">
+  <div class="stats-empty">No rolls yet</div>
 </div>
 
 <div class="divider"></div>
@@ -342,8 +400,78 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // ── Stats panel ──────────────────────────────────────────────
+  let statsOpen = true;
+
+  document.getElementById('stats-hdr').addEventListener('click', () => {
+    statsOpen = !statsOpen;
+    document.getElementById('stats-body').style.display = statsOpen ? 'block' : 'none';
+    document.getElementById('stats-chevron').textContent = statsOpen ? '▲' : '▼';
+  });
+
+  async function refreshStats() {
+    const body = document.getElementById('stats-body');
+    let data;
+    try { data = await api.invoke('stats:get'); } catch { return; }
+
+    if (!data?.summary?.total_rolls) {
+      body.innerHTML = '<div class="stats-empty">No rolls yet</div>';
+      return;
+    }
+
+    const s    = data.summary;
+    const dist = data.distribution || {};
+    const bands = [
+      { label: '1–5',   key: 'band_1_5',    cls: 'low'  },
+      { label: '6–10',  key: 'band_6_10',   cls: 'mid'  },
+      { label: '11–15', key: 'band_11_15',  cls: 'good' },
+      { label: '16–20', key: 'band_16_20',  cls: 'high' },
+      { label: '21+',   key: 'band_20plus', cls: 'crit' },
+    ];
+    const distTotal = bands.reduce((sum, b) => sum + (dist[b.key] || 0), 0);
+    const distRows  = distTotal ? bands.map(b => {
+      const count = dist[b.key] || 0;
+      const pct   = Math.round((count / distTotal) * 100);
+      return `<div class="dist-row">
+        <div class="dist-label">${b.label}</div>
+        <div class="dist-track"><div class="dist-fill ${b.cls}" style="width:${pct}%"></div></div>
+        <div class="dist-count">${count}</div>
+      </div>`;
+    }).join('') : '';
+
+    body.innerHTML = `
+      <div class="stats-grid">
+        <div class="stat-cell">
+          <div class="stat-val">${s.total_rolls}</div>
+          <div class="stat-key">Rolls</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-val">${s.avg_roll ?? '—'}</div>
+          <div class="stat-key">Average</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-val gold">${s.total_crits} <span style="font-size:10px;color:#705a3a">${s.crit_pct}%</span></div>
+          <div class="stat-key">Crits</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-val red">${s.total_nat1s} <span style="font-size:10px;color:#705a3a">${s.nat1_pct}%</span></div>
+          <div class="stat-key">Nat 1s</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-val green">${s.highest_roll ?? '—'}</div>
+          <div class="stat-key">High</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-val">${s.lowest_roll ?? '—'}</div>
+          <div class="stat-key">Low</div>
+        </div>
+      </div>
+      ${distRows}
+    `;
+  }
+
   // ── IPC listeners ────────────────────────────────────────────
-  api.on('roll:display',    r    => prependRoll(r));
+  api.on('roll:display',    r    => { prependRoll(r); refreshStats(); });
   api.on('initiative:sync', list => renderInitiative(list));
   api.on('hp:update', ({ combatant_name, hp_current }) =>
     renderInitiative(initiativeList.map(c =>
@@ -402,7 +530,6 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   // ── Bootstrap ────────────────────────────────────────────────
-  // Small delay so main.js activeSession is fully set before we query
   setTimeout(async () => {
     try {
       const rolls = await api.invoke('rolls:get');
@@ -413,7 +540,11 @@ window.addEventListener('DOMContentLoaded', () => {
       const list = await api.invoke('initiative:get');
       renderInitiative(list || []);
     } catch (e) { console.warn('[overlay-dm] initiative:get failed:', e); }
+
+    refreshStats();
   }, 300);
+
+  setInterval(refreshStats, 30000);
 
 });
 </script>

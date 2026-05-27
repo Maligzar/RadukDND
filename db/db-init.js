@@ -394,6 +394,39 @@ function getStatements(campaignDb) {
     markEncounterUsed: campaignDb.prepare(`
       UPDATE encounters_log SET used=1 WHERE id=?
     `),
+
+    // stats
+    getSessionStats: campaignDb.prepare(`
+      SELECT
+        COUNT(*)                                              AS total_rolls,
+        ROUND(AVG(CAST(total AS REAL)), 1)                   AS avg_roll,
+        MAX(total)                                           AS highest_roll,
+        MIN(total)                                           AS lowest_roll,
+        SUM(is_crit)                                         AS total_crits,
+        SUM(is_nat1)                                         AS total_nat1s,
+        ROUND(100.0 * SUM(is_crit) / MAX(COUNT(*), 1), 1)   AS crit_pct,
+        ROUND(100.0 * SUM(is_nat1) / MAX(COUNT(*), 1), 1)   AS nat1_pct
+      FROM rolls
+      WHERE session_id=? AND is_secret=0 AND source='ddb'
+    `),
+    getRollDistribution: campaignDb.prepare(`
+      SELECT
+        SUM(CASE WHEN total BETWEEN 1  AND 5  THEN 1 ELSE 0 END) AS band_1_5,
+        SUM(CASE WHEN total BETWEEN 6  AND 10 THEN 1 ELSE 0 END) AS band_6_10,
+        SUM(CASE WHEN total BETWEEN 11 AND 15 THEN 1 ELSE 0 END) AS band_11_15,
+        SUM(CASE WHEN total BETWEEN 16 AND 20 THEN 1 ELSE 0 END) AS band_16_20,
+        SUM(CASE WHEN total >= 21             THEN 1 ELSE 0 END) AS band_20plus
+      FROM rolls
+      WHERE session_id=? AND is_secret=0 AND source='ddb'
+    `),
+    getTopActions: campaignDb.prepare(`
+      SELECT action_label, COUNT(*) AS count, ROUND(AVG(CAST(total AS REAL)), 1) AS avg_total
+      FROM rolls
+      WHERE session_id=? AND is_secret=0 AND source='ddb' AND action_label IS NOT NULL
+      GROUP BY action_label
+      ORDER BY count DESC
+      LIMIT 8
+    `),
   };
 }
 

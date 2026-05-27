@@ -32,6 +32,7 @@ const ALLOWED_INVOKE = new Set([
   'bestiary:query',
   'bestiary:get-monster',
   'encounter:save',
+  'stats:get',
 ]);
 
 // Channels the renderer is allowed to RECEIVE from main

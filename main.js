@@ -299,6 +299,17 @@ function registerIpcHandlers() {
       : db.getPublicRolls.all(activeSession.id);
   });
 
+  // ── Roll stats ─────────────────────────────────────────────
+  ipcMain.handle('stats:get', () => {
+    if (!activeSession) return null;
+    const id = activeSession.id;
+    return {
+      summary:      db.getSessionStats.get(id),
+      distribution: db.getRollDistribution.get(id),
+      topActions:   db.getTopActions.all(id),
+    };
+  });
+
   // ── Discord strip resize ───────────────────────────────────
   ipcMain.on('discord:resize', (_, { height }) => {
     discordStripH = Math.max(60, Math.min(320, height));
