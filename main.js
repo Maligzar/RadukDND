@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, BrowserWindow, BrowserView, ipcMain, session } = require('electron');
+const { app, BrowserWindow, BrowserView, ipcMain } = require('electron');
 const path = require('path');
 const { openCampaignDb, openBestiaryDb, getStatements } = require('./db/db-init');
 
@@ -25,7 +25,7 @@ let overlayView  = null;
 let viewsCreated = false;
 
 const HEADER_H  = 34;
-const DISCORD_H = 220; // taller default so video frames render properly
+const DISCORD_H = 160;
 const SIDEBAR_W = 260;
 let discordStripH = DISCORD_H;
 
@@ -84,43 +84,44 @@ function createMainWindow() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Titlebar — sits BELOW the Discord video strip once views are live.
-// Before role selection the strip doesn't exist, so titlebar stays at y:0.
+// Titlebar layout — always full width, always at y:0
+// Called on startup and every resize.
 // ─────────────────────────────────────────────────────────────
 function layoutTitlebar() {
   if (!mainWindow || !titlebarView) return;
   const [winW] = mainWindow.getContentSize();
-  const titleY = viewsCreated ? discordStripH : 0;
-  titlebarView.setBounds({ x: 0, y: titleY, width: winW, height: HEADER_H });
+  titlebarView.setBounds({ x: 0, y: 0, width: winW, height: HEADER_H });
+  // Ensure titlebar stays on top by re-adding it last
   mainWindow.removeBrowserView(titlebarView);
   mainWindow.addBrowserView(titlebarView);
 }
 
 // ─────────────────────────────────────────────────────────────
-// Layout — Discord video at top (y:0), titlebar below it,
-// then DDB/Roll20 and sidebar below the titlebar.
+// Layout — positions all content BrowserViews below the titlebar
 // ─────────────────────────────────────────────────────────────
 function layoutViews() {
   if (!mainWindow || !appRole) return;
 
   const [winW, winH] = mainWindow.getContentSize();
-  const contentTop = discordStripH + HEADER_H;
-  const contentH   = winH - contentTop;
-  const mainW      = winW - SIDEBAR_W;
+  const contentTop   = HEADER_H + discordStripH;
+  const contentH     = winH - contentTop;
+  const mainW        = winW - SIDEBAR_W;
+  const sidebarH     = winH - HEADER_H;
 
-  // Discord video strip — full width, top of window
-  if (discordView) discordView.setBounds({ x: 0, y: 0, width: winW, height: discordStripH });
+  // Discord strip spans full width below the titlebar
+  if (discordView) discordView.setBounds({ x: 0, y: HEADER_H, width: winW, height: discordStripH });
 
   if (appRole === 'player') {
     if (ddbView)     ddbView.setBounds({ x: 0, y: contentTop, width: mainW, height: contentH });
-    if (overlayView) overlayView.setBounds({ x: mainW, y: contentTop, width: SIDEBAR_W, height: contentH });
+    if (overlayView) overlayView.setBounds({ x: mainW, y: HEADER_H, width: SIDEBAR_W, height: sidebarH });
     if (roll20View)  roll20View.setBounds({ x: 0, y: 0, width: 0, height: 0 });
   } else if (appRole === 'dm') {
     if (roll20View)  roll20View.setBounds({ x: 0, y: contentTop, width: mainW, height: contentH });
-    if (overlayView) overlayView.setBounds({ x: mainW, y: contentTop, width: SIDEBAR_W, height: contentH });
+    if (overlayView) overlayView.setBounds({ x: mainW, y: HEADER_H, width: SIDEBAR_W, height: sidebarH });
     if (ddbView)     ddbView.setBounds({ x: 0, y: 0, width: 0, height: 0 });
   }
 
+  // Keep titlebar on top after every layout
   layoutTitlebar();
 }
 
@@ -135,27 +136,12 @@ function createViews(role) {
   }
   viewsCreated = true;
 
-  // Discord strip — persistent session so the user stays logged in across launches.
-  // Granted camera, microphone, and display-capture so voice/video calls work.
-  const discordSession = session.fromPartition('persist:discord', { cache: true });
-  discordSession.setPermissionRequestHandler((_, permission, callback) => {
-    const allowed = ['media', 'camera', 'microphone', 'display-capture', 'audioCapture', 'videoCapture'];
-    callback(allowed.includes(permission));
-  });
-  discordSession.setPermissionCheckHandler((_, permission) => {
-    const allowed = ['media', 'camera', 'microphone', 'display-capture', 'audioCapture', 'videoCapture'];
-    return allowed.includes(permission);
-  });
-
+  // Discord strip placeholder
   discordView = new BrowserView({
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      session: discordSession,
-    },
+    webPreferences: { contextIsolation: true, nodeIntegration: false },
   });
   mainWindow.addBrowserView(discordView);
-  discordView.webContents.loadURL('https://discord.com/app');
+  discordView.webContents.loadFile(path.join(__dirname, 'renderer', 'discord-strip.html'));
 
   // D&D Beyond
   ddbView = new BrowserView({
@@ -324,17 +310,10 @@ function registerIpcHandlers() {
     };
   });
 
-  // ── Discord strip drag-resize ──────────────────────────────
+  // ── Discord strip resize ───────────────────────────────────
   ipcMain.on('discord:resize', (_, { height }) => {
-    discordStripH = Math.max(0, Math.min(480, height));
-    layoutViews(); // also calls layoutTitlebar()
-  });
-
-  // Snap presets: 'hidden' | 'strip' | 'video' | 'tall'
-  ipcMain.on('discord:snap', (_, { preset }) => {
-    const heights = { hidden: 0, strip: 60, video: 220, tall: 400 };
-    discordStripH = heights[preset] ?? DISCORD_H;
-    layoutViews(); // also calls layoutTitlebar()
+    discordStripH = Math.max(60, Math.min(320, height));
+    layoutViews();
   });
 
   // ── Bestiary — Phase 10 fix: DM role gate added ───────────

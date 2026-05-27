@@ -16,7 +16,6 @@ const ALLOWED_SEND = new Set([
   'initiative:set-turn',
   'initiative:clear',
   'discord:resize',
-  'discord:snap',
   'session:end',
   // Phase 10: window controls
   'window:exit',
