@@ -2,8 +2,7 @@
 
 const { ipcRenderer } = require('electron');
 
-// Parse current character ID from the URL so we can ignore other party
-// members' roll notifications that appear on the same page.
+// ─── Character ID from URL ────────────────────────────────────────────────────
 function getCharacterIdFromUrl() {
   const m = window.location.pathname.match(/\/characters\/(\d+)/i);
   return m ? m[1] : null;
@@ -11,7 +10,6 @@ function getCharacterIdFromUrl() {
 
 let currentCharacterId = getCharacterIdFromUrl();
 
-// Re-check on SPA navigation
 const _pushState = history.pushState.bind(history);
 history.pushState = function (...args) {
   _pushState(...args);
@@ -21,7 +19,28 @@ window.addEventListener('popstate', () => {
   currentCharacterId = getCharacterIdFromUrl();
 });
 
-// Build a normalised payload matching the roll:captured schema in main.js
+// ─── Cross-layer deduplication ────────────────────────────────────────────────
+// All three capture layers funnel through here. A roll is emitted at most once
+// per 3-second window per (label + total) signature. This prevents:
+//   • DDB.Dice.Roll + DDB.Dice.RollResult both firing for one physical roll
+//   • MutationObserver firing after a DOM event already captured the roll
+//   • Fetch interceptor double-firing with DOM events
+const recentKeys = new Map(); // key → expiry timestamp
+
+function emit(roll) {
+  const key = `${roll.action_label ?? ''}:${roll.total}`;
+  const now = Date.now();
+
+  if (recentKeys.has(key) && recentKeys.get(key) > now) return;
+
+  recentKeys.set(key, now + 3000);
+  setTimeout(() => recentKeys.delete(key), 3100);
+
+  console.log('[DM:DDB] Roll emitted:', roll.action_label, roll.total);
+  ipcRenderer.send('roll:captured', roll);
+}
+
+// ─── Payload normalisation ────────────────────────────────────────────────────
 function buildPayload({ expression, result, label, isCrit, isFumble }) {
   const exprMatch = expression.match(/^([\dd+\-*]+?)([+\-]\d+)?$/i);
   const dice_type = exprMatch ? exprMatch[1].trim() : expression;
@@ -42,55 +61,32 @@ function buildPayload({ expression, result, label, isCrit, isFumble }) {
   };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// LAYER 1: DOM Event Interception
-// D&D Beyond dispatches custom events on the document when a roll happens.
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── LAYER 1: DOM Events ──────────────────────────────────────────────────────
+// Only listen to RollResult (final value). DDB.Dice.Roll fires at click-time
+// before the result exists — listening to it causes double-records.
 
-const DDB_ROLL_EVENTS = [
-  'DDB.Dice.Roll',
-  'DDB.Dice.RollResult',
-];
-
-function parseDDBRollEvent(event) {
+window.addEventListener('DDB.Dice.RollResult', (event) => {
   try {
     const d = event.detail ?? event.data ?? {};
 
-    // If the event includes a character entity ID that doesn't match the
-    // current character, this is a party notification — skip it.
     const entityId = String(d.entityId ?? d.characterId ?? d.entity_id ?? '');
-    if (entityId && currentCharacterId && entityId !== currentCharacterId) return null;
+    if (entityId && currentCharacterId && entityId !== currentCharacterId) return;
 
     const result = d.result ?? d.total ?? null;
-    if (result === null) return null;
+    if (result === null) return;
 
-    return {
-      expression: d.diceExpression ?? d.rollExpression ?? d.expression ?? '?',
+    emit(buildPayload({
+      expression: d.diceExpression ?? d.rollExpression ?? d.expression ?? '1d20',
       result,
-      label:    d.context   ?? d.label   ?? d.rollType ?? null,
-      isCrit:   !!(d.isCritical  ?? d.criticalHit),
-      isFumble: !!(d.isFumble    ?? d.criticalFail),
-    };
-  } catch {
-    return null;
-  }
-}
+      label:    d.context ?? d.label ?? d.rollType ?? null,
+      isCrit:   !!(d.isCritical ?? d.criticalHit),
+      isFumble: !!(d.isFumble   ?? d.criticalFail),
+    }));
+  } catch {}
+}, true);
 
-for (const eventName of DDB_ROLL_EVENTS) {
-  window.addEventListener(eventName, (event) => {
-    const roll = parseDDBRollEvent(event);
-    if (roll) {
-      console.log('[DM:DDB] Roll event captured:', roll);
-      ipcRenderer.send('roll:captured', buildPayload(roll));
-    }
-  }, true);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// LAYER 2: MutationObserver on the dice result popup
-// Fallback: watches for the result tooltip DDB renders after each roll.
-// Skips popups that belong to other party members.
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── LAYER 2: MutationObserver on dice result popup ───────────────────────────
+// Fallback for when DOM events don't fire. Skips party-member notifications.
 
 const RESULT_SELECTORS = {
   container: '[class*="dice-roll-result"]',
@@ -99,7 +95,6 @@ const RESULT_SELECTORS = {
   detail:    '[class*="dice-roll-result__dice-detail"]',
 };
 
-// Containers that identify a roll as belonging to another party member
 const PARTY_SELECTORS = [
   '[class*="party-member"]',
   '[class*="PlayerName"]',
@@ -108,8 +103,6 @@ const PARTY_SELECTORS = [
   '[class*="notification"]',
   '[class*="toast"]',
 ];
-
-let lastReportedResult = null;
 
 function isPartyNotification(node) {
   return PARTY_SELECTORS.some(
@@ -133,7 +126,6 @@ function extractRollFromPopup(node) {
     const label      = typeEl?.textContent.trim() ?? null;
     const detailText = detailEl?.textContent.trim() ?? '';
 
-    // DDB shows detail like "d20 + 5 = 20"
     const expressionMatch = detailText.match(/^([d0-9+\-\s]+)=/i);
     const expression = expressionMatch
       ? expressionMatch[1].trim().replace(/\s+/g, '')
@@ -150,7 +142,13 @@ function extractRollFromPopup(node) {
   }
 }
 
+// Delay observer start so DDB's initial React render doesn't fire false positives
+let observerReady = false;
+setTimeout(() => { observerReady = true; }, 4000);
+
 const observer = new MutationObserver((mutations) => {
+  if (!observerReady) return;
+
   for (const mutation of mutations) {
     for (const node of mutation.addedNodes) {
       if (!(node instanceof HTMLElement)) continue;
@@ -162,16 +160,7 @@ const observer = new MutationObserver((mutations) => {
       if (!target) continue;
 
       const roll = extractRollFromPopup(target);
-      if (!roll) continue;
-
-      // Debounce: skip duplicate results within 500ms
-      const key = `${roll.expression}:${roll.result}`;
-      if (key === lastReportedResult) continue;
-      lastReportedResult = key;
-      setTimeout(() => { lastReportedResult = null; }, 500);
-
-      console.log('[DM:DDB] Popup roll captured:', roll);
-      ipcRenderer.send('roll:captured', buildPayload(roll));
+      if (roll) emit(buildPayload(roll));
     }
   }
 });
@@ -184,13 +173,11 @@ if (document.readyState === 'loading') {
 
 function startObserver() {
   observer.observe(document.body, { childList: true, subtree: true });
-  console.log('[DM:DDB] Preload active. Character ID:', currentCharacterId ?? 'unknown (navigate to character sheet)');
+  console.log('[DM:DDB] Preload active. Character:', currentCharacterId ?? 'unknown (open character sheet)');
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// LAYER 3: Fetch Intercept
-// Cleanest source — DDB API responses include character attribution.
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── LAYER 3: Fetch Intercept ─────────────────────────────────────────────────
+// Cleanest data source when DDB's API is used. Character ID checked in response.
 
 const ROLL_API_PATTERN = /\/api\/dice\/roll|\/dice-roll/i;
 
@@ -201,40 +188,27 @@ window.fetch = async function (...args) {
   try {
     const url = typeof args[0] === 'string' ? args[0] : (args[0]?.url ?? '');
     if (ROLL_API_PATTERN.test(url)) {
-      const clone = response.clone();
-      clone.json().then((data) => {
-        const roll = parseAPIRollData(data);
-        if (roll) {
-          console.log('[DM:DDB] API roll intercepted:', roll);
-          ipcRenderer.send('roll:captured', buildPayload(roll));
-        }
+      response.clone().json().then((data) => {
+        const entityId = String(data?.data?.characterId ?? data?.entityId ?? '');
+        if (entityId && currentCharacterId && entityId !== currentCharacterId) return;
+
+        const rolls = data?.data?.diceRolls ?? data?.rolls ?? [];
+        if (!rolls.length) return;
+
+        const roll   = rolls[0];
+        const result = roll?.total ?? roll?.result ?? null;
+        if (result === null) return;
+
+        emit(buildPayload({
+          expression: roll?.diceExpression ?? roll?.expression ?? '1d20',
+          result,
+          label:    data?.data?.context ?? data?.context ?? null,
+          isCrit:   !!(roll?.isCritical || data?.data?.isCritical),
+          isFumble: false,
+        }));
       }).catch(() => {});
     }
   } catch {}
 
   return response;
 };
-
-function parseAPIRollData(data) {
-  try {
-    // Check character attribution — skip if this API response belongs to
-    // another character (e.g., party sync endpoint)
-    const entityId = String(data?.data?.characterId ?? data?.entityId ?? '');
-    if (entityId && currentCharacterId && entityId !== currentCharacterId) return null;
-
-    const rolls = data?.data?.diceRolls ?? data?.rolls ?? [];
-    if (!rolls.length) return null;
-
-    const roll   = rolls[0];
-    const result = roll?.total ?? roll?.result ?? null;
-    if (result === null) return null;
-
-    const expr   = roll?.diceExpression ?? roll?.expression ?? '?';
-    const isCrit = !!(roll?.isCritical || data?.data?.isCritical);
-    const label  = data?.data?.context ?? data?.context ?? null;
-
-    return { expression: expr, result, label, isCrit, isFumble: false };
-  } catch {
-    return null;
-  }
-}
