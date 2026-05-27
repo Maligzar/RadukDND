@@ -6,6 +6,12 @@
 
 const { contextBridge, ipcRenderer } = require('electron');
 
+contextBridge.exposeInMainWorld('ipcRenderer', {
+  on: (channel, callback) => ipcRenderer.on(channel, (_event, data) => callback(data)),
+  invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),
+  send: (channel, ...args) => ipcRenderer.send(channel, ...args),
+});
+
 contextBridge.exposeInMainWorld('dmBridge', {
 
   // ── Roll events (listen from main process) ──────────────────────────────

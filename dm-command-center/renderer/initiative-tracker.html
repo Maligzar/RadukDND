@@ -1,0 +1,256 @@
+<div id="initiative-panel" class="tracker-panel" style="display: none;">
+  <div class="tracker-header">
+    <h2>Combat Tracker</h2>
+    <div class="round-display">Round <span id="round-number">1</span></div>
+  </div>
+
+  <div class="tracker-controls">
+    <form id="add-combatant-form">
+      <input type="text" id="combatant-name" placeholder="Name" required />
+      <input type="number" id="combatant-ac" placeholder="AC" min="0" value="10" />
+      <input type="number" id="combatant-hp-max" placeholder="Max HP" min="1" required />
+      <input type="number" id="combatant-init" placeholder="Initiative" min="0" max="20" />
+      <button type="submit">+ Add</button>
+    </form>
+    <div class="tracker-buttons">
+      <button id="btn-roll-init" class="btn-secondary">Roll Initiative All</button>
+      <button id="btn-start-combat" class="btn-primary">Start Combat</button>
+      <button id="btn-next-turn" class="btn-primary">Next Turn</button>
+      <button id="btn-clear-combat" class="btn-danger">Clear Combat</button>
+    </div>
+  </div>
+
+  <table class="initiative-table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Init</th>
+        <th>AC</th>
+        <th>HP</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="combat-roster">
+      <!-- Rows populated by JS -->
+    </tbody>
+  </table>
+
+  <div id="combat-status" class="combat-status" style="display: none;">
+    <span id="active-combatant"></span> is up!
+  </div>
+</div>
+
+<style>
+#initiative-panel {
+  background: rgba(13, 11, 8, 0.95);
+  border: 1px solid #8b7355;
+  border-radius: 4px;
+  padding: 12px;
+  font-family: 'Courier New', monospace;
+  color: #d0af57;
+  font-size: 12px;
+}
+
+.tracker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #8b7355;
+  padding-bottom: 8px;
+}
+
+.tracker-header h2 {
+  margin: 0;
+  font-size: 16px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.round-display {
+  background: #2a2520;
+  padding: 4px 8px;
+  border-radius: 3px;
+  font-weight: bold;
+}
+
+.tracker-controls {
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #8b7355;
+}
+
+#add-combatant-form {
+  display: grid;
+  grid-template-columns: 1fr 0.5fr 0.5fr 0.5fr auto;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+#add-combatant-form input {
+  background: #2a2520;
+  border: 1px solid #8b7355;
+  color: #d0af57;
+  padding: 4px 6px;
+  border-radius: 3px;
+  font-family: inherit;
+  font-size: 11px;
+}
+
+#add-combatant-form input::placeholder {
+  color: #8b7355;
+}
+
+#add-combatant-form button {
+  background: #8b7355;
+  color: #0d0b08;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 11px;
+}
+
+#add-combatant-form button:hover {
+  background: #a89968;
+}
+
+.tracker-buttons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.btn-primary, .btn-secondary, .btn-danger {
+  padding: 4px 8px;
+  border: 1px solid #8b7355;
+  background: #2a2520;
+  color: #d0af57;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+  font-family: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.btn-primary:hover {
+  background: #8b7355;
+  color: #0d0b08;
+}
+
+.btn-secondary:hover {
+  background: #4a4540;
+}
+
+.btn-danger:hover {
+  background: #8b3333;
+  border-color: #c44444;
+}
+
+.initiative-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0;
+  font-size: 11px;
+}
+
+.initiative-table th {
+  background: #2a2520;
+  border-bottom: 2px solid #8b7355;
+  padding: 6px;
+  text-align: left;
+  font-weight: bold;
+  text-transform: uppercase;
+  color: #d0af57;
+}
+
+.initiative-table td {
+  padding: 6px;
+  border-bottom: 1px solid #3a3530;
+  vertical-align: middle;
+}
+
+.initiative-table tbody tr {
+  background: transparent;
+}
+
+.initiative-table tbody tr.active {
+  background: rgba(139, 115, 85, 0.2);
+  border-left: 3px solid #d0af57;
+}
+
+.initiative-table tbody tr.dead {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+.hp-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.hp-bar-fill {
+  height: 16px;
+  min-width: 40px;
+  border: 1px solid #8b7355;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #4a7c3a, #2a4a2a);
+  position: relative;
+}
+
+.hp-bar-fill.critical {
+  background: linear-gradient(90deg, #8b3333, #5a1a1a);
+}
+
+.hp-bar-fill.healthy {
+  background: linear-gradient(90deg, #3a6a3a, #1a3a1a);
+}
+
+.hp-text {
+  font-size: 10px;
+  white-space: nowrap;
+  min-width: 45px;
+  text-align: right;
+}
+
+.combatant-actions {
+  text-align: center;
+}
+
+.combatant-actions button {
+  background: none;
+  border: 1px solid #8b7355;
+  color: #d0af57;
+  padding: 2px 6px;
+  cursor: pointer;
+  font-size: 10px;
+  border-radius: 2px;
+  margin: 0 2px;
+}
+
+.combatant-actions button:hover {
+  background: #8b7355;
+  color: #0d0b08;
+}
+
+.combat-status {
+  margin-top: 8px;
+  padding: 8px;
+  background: #2a2520;
+  border: 1px solid #d0af57;
+  border-radius: 3px;
+  text-align: center;
+  font-weight: bold;
+  color: #d0af57;
+  text-transform: uppercase;
+}
+
+#active-combatant {
+  color: #ffcc00;
+  font-weight: bold;
+}
+</style>

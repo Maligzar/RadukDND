@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>DM Overlay</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #0d0b08;
+      color: #d0af57;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      overflow: hidden;
+      height: 100vh;
+    }
+
+    .overlay-container {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      padding: 8px;
+    }
+
+    .tab-bar {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 8px;
+      border-bottom: 1px solid #8b7355;
+      padding-bottom: 4px;
+    }
+
+    .tab-button {
+      background: #2a2520;
+      border: 1px solid #8b7355;
+      color: #8b7355;
+      padding: 6px 12px;
+      cursor: pointer;
+      border-radius: 3px 3px 0 0;
+      font-family: inherit;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      transition: all 0.2s;
+    }
+
+    .tab-button.active {
+      background: #8b7355;
+      color: #0d0b08;
+      border-color: #d0af57;
+    }
+
+    .tab-button:hover:not(.active) {
+      background: #3a3530;
+      color: #d0af57;
+    }
+
+    .tab-content {
+      display: none;
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .session-info {
+      background: rgba(13, 11, 8, 0.95);
+      border: 1px solid #8b7355;
+      padding: 8px;
+      border-radius: 4px;
+      margin-bottom: 8px;
+      font-size: 11px;
+    }
+
+    .session-info-row {
+      display: flex;
+      justify-content: space-between;
+      margin: 4px 0;
+    }
+
+    .session-code {
+      background: #2a2520;
+      padding: 4px 8px;
+      border-radius: 3px;
+      font-weight: bold;
+      color: #ffcc00;
+    }
+
+    .roll-display {
+      background: rgba(13, 11, 8, 0.95);
+      border: 1px solid #8b7355;
+      border-radius: 4px;
+      padding: 8px;
+      margin-bottom: 8px;
+    }
+
+    .roll-item {
+      background: #2a2520;
+      padding: 6px;
+      margin: 4px 0;
+      border-left: 3px solid #d0af57;
+      border-radius: 2px;
+      font-size: 11px;
+    }
+
+    .roll-item.crit {
+      border-left-color: #ffcc00;
+      background: #3a3530;
+    }
+
+    .roll-item.fail {
+      border-left-color: #8b3333;
+    }
+
+    .roll-label {
+      font-weight: bold;
+      color: #d0af57;
+    }
+
+    .roll-value {
+      color: #ffcc00;
+      font-weight: bold;
+    }
+
+    .roll-meta {
+      font-size: 10px;
+      color: #8b7355;
+      margin-top: 2px;
+    }
+
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #2a2520;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #8b7355;
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #a89968;
+    }
+  </style>
+</head>
+<body>
+  <div class="overlay-container">
+    <div class="session-info">
+      <div class="session-info-row">
+        <span>Session Code:</span>
+        <span class="session-code" id="session-code">—</span>
+      </div>
+      <div class="session-info-row">
+        <span>Players Connected:</span>
+        <span id="player-count">1</span>
+      </div>
+    </div>
+
+    <div class="tab-bar">
+      <button class="tab-button active" data-tab="rolls">Rolls</button>
+      <button class="tab-button" data-tab="initiative">Initiative</button>
+      <button class="tab-button" data-tab="actions">Actions</button>
+    </div>
+
+    <div class="tab-content active" id="tab-rolls">
+      <div class="roll-display">
+        <div id="rolls-list">
+          <div style="color: #8b7355; text-align: center; padding: 20px;">
+            No rolls yet
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-initiative">
+      <!-- initiative-tracker.html will be injected here -->
+    </div>
+
+    <div class="tab-content" id="tab-actions">
+      <div style="color: #8b7355; text-align: center; padding: 20px;">
+        Action options coming in Phase 13
+      </div>
+    </div>
+  </div>
+
+  <script src="./overlay-dm.js"></script>
+</body>
+</html>

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Player Overlay</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #0d0b08;
+      color: #d0af57;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      overflow: hidden;
+      height: 100vh;
+    }
+
+    .overlay-container {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      padding: 8px;
+    }
+
+    .session-info {
+      background: rgba(13, 11, 8, 0.95);
+      border: 1px solid #8b7355;
+      padding: 8px;
+      border-radius: 4px;
+      margin-bottom: 8px;
+      font-size: 11px;
+    }
+
+    .session-info-row {
+      display: flex;
+      justify-content: space-between;
+      margin: 4px 0;
+    }
+
+    .session-code {
+      background: #2a2520;
+      padding: 4px 8px;
+      border-radius: 3px;
+      font-weight: bold;
+      color: #ffcc00;
+    }
+
+    .roll-display {
+      background: rgba(13, 11, 8, 0.95);
+      border: 1px solid #8b7355;
+      border-radius: 4px;
+      padding: 8px;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .roll-item {
+      background: #2a2520;
+      padding: 6px;
+      margin: 4px 0;
+      border-left: 3px solid #d0af57;
+      border-radius: 2px;
+      font-size: 11px;
+    }
+
+    .roll-item.crit {
+      border-left-color: #ffcc00;
+      background: #3a3530;
+    }
+
+    .roll-item.fail {
+      border-left-color: #8b3333;
+    }
+
+    .roll-label {
+      font-weight: bold;
+      color: #d0af57;
+    }
+
+    .roll-value {
+      color: #ffcc00;
+      font-weight: bold;
+    }
+
+    .roll-meta {
+      font-size: 10px;
+      color: #8b7355;
+      margin-top: 2px;
+    }
+
+    .combat-status {
+      background: rgba(13, 11, 8, 0.95);
+      border: 1px solid #8b7355;
+      border-radius: 4px;
+      padding: 8px;
+      margin-top: 8px;
+    }
+
+    .combat-status-title {
+      text-transform: uppercase;
+      font-weight: bold;
+      margin-bottom: 4px;
+      font-size: 11px;
+    }
+
+    .combat-roster-mini {
+      font-size: 10px;
+    }
+
+    .combat-roster-mini > div {
+      padding: 3px;
+      margin: 2px 0;
+      background: #2a2520;
+      border-radius: 2px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .combat-roster-mini > div.active {
+      background: rgba(139, 115, 85, 0.3);
+      border-left: 2px solid #ffcc00;
+      padding-left: 2px;
+    }
+
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #2a2520;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #8b7355;
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #a89968;
+    }
+  </style>
+</head>
+<body>
+  <div class="overlay-container">
+    <div class="session-info">
+      <div class="session-info-row">
+        <span>Connected to:</span>
+        <span class="session-code" id="session-code">—</span>
+      </div>
+      <div class="session-info-row">
+        <span>Players in Session:</span>
+        <span id="player-count">1</span>
+      </div>
+    </div>
+
+    <div class="roll-display">
+      <div id="rolls-list">
+        <div style="color: #8b7355; text-align: center; padding: 20px;">
+          Waiting for DM to start...
+        </div>
+      </div>
+    </div>
+
+    <div class="combat-status" style="display: none;" id="combat-status">
+      <div class="combat-status-title">⚔ Combat</div>
+      <div class="combat-roster-mini" id="combat-roster-mini">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+  </div>
+
+  <script src="./overlay-player.js"></script>
+</body>
+</html>

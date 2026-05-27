@@ -288,6 +288,16 @@ function registerIpcHandlers() {
       : db.getPublicRolls.all(activeSession.id);
   });
 
+  // ── Session info ─────────────────────────────────────────
+  ipcMain.handle('session:get-info', () => {
+    if (!activeSession) return null;
+    return {
+      code: activeSession.code,
+      role: activeSession.role,
+      playerCount: 1, // TODO: Get from relay in Phase 11.5
+    };
+  });
+
   // ── Discord strip resize ─────────────────────────────────
   ipcMain.on('discord:resize', (_, { height }) => {
     discordStripH = Math.max(60, Math.min(320, height));
