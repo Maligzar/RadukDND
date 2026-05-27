@@ -155,15 +155,15 @@ function createViews(role) {
   ddbView.webContents.loadURL('https://www.dndbeyond.com');
   ddbView.webContents.openDevTools({ mode: 'detach' });
 
-  // Roll20 (DM only)
+  // Roll20 — shared map for all roles
   roll20View = new BrowserView({
     webPreferences: {
-      preload: role === 'dm' ? path.join(__dirname, 'preload-r20.js') : undefined,
+      preload: path.join(__dirname, 'preload-r20.js'),
       contextIsolation: true, nodeIntegration: false,
     },
   });
   mainWindow.addBrowserView(roll20View);
-  if (role === 'dm') roll20View.webContents.loadURL('https://app.roll20.net');
+  roll20View.webContents.loadURL('https://app.roll20.net');
 
   // Overlay sidebar
   overlayView = new BrowserView({
