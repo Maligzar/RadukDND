@@ -15,20 +15,22 @@ let activeSession = null;
 let appRole       = null;
 
 // BrowserView references (Electron 29 API for embedded panels)
-let titlebarView = null; // always-on-top full-width title bar
-let ddbView      = null;
-let roll20View   = null;
-let discordView  = null;
-let overlayView  = null;
+let titlebarView    = null; // always-on-top full-width title bar
+let cardBrowserView = null; // Phase 13: card browser (spells/items) on left
+let ddbView         = null;
+let roll20View      = null;
+let discordView     = null;
+let overlayView     = null;
 
 // Phase 10: guard against duplicate createViews() calls
 let viewsCreated = false;
 let activeView   = 'ddb'; // 'ddb' | 'roll20'
 
-const HEADER_H  = 34;
-const DISCORD_H = 160;
-const SIDEBAR_W = 260;
-let discordStripH = DISCORD_H;
+const HEADER_H       = 34;
+const DISCORD_H      = 160;
+const SIDEBAR_W      = 260;
+const CARD_BROWSER_W = 80; // Phase 13: collapsible card browser (left sidebar)
+let discordStripH    = DISCORD_H;
 
 // ─────────────────────────────────────────────────────────────
 // App ready
@@ -106,18 +108,24 @@ function layoutViews() {
   const [winW, winH] = mainWindow.getContentSize();
   const contentTop   = HEADER_H + discordStripH;
   const contentH     = winH - contentTop;
-  const mainW        = winW - SIDEBAR_W;
+  const mainW        = winW - SIDEBAR_W - CARD_BROWSER_W;
   const sidebarH     = winH - HEADER_H;
+
+  // Phase 13: Card browser on left (80px)
+  if (cardBrowserView) {
+    cardBrowserView.setBounds({ x: 0, y: HEADER_H, width: CARD_BROWSER_W, height: sidebarH });
+  }
 
   // Discord strip spans full width below the titlebar
   if (discordView) discordView.setBounds({ x: 0, y: HEADER_H, width: winW, height: discordStripH });
 
-  const showBounds = { x: 0, y: contentTop, width: mainW, height: contentH };
+  // Main content shifted right by card browser width
+  const showBounds = { x: CARD_BROWSER_W, y: contentTop, width: mainW, height: contentH };
   const hideBounds = { x: 0, y: 0, width: 0, height: 0 };
 
   if (ddbView)     ddbView.setBounds(activeView === 'ddb'    ? showBounds : hideBounds);
   if (roll20View)  roll20View.setBounds(activeView === 'roll20' ? showBounds : hideBounds);
-  if (overlayView) overlayView.setBounds({ x: mainW, y: HEADER_H, width: SIDEBAR_W, height: sidebarH });
+  if (overlayView) overlayView.setBounds({ x: CARD_BROWSER_W + mainW, y: HEADER_H, width: SIDEBAR_W, height: sidebarH });
 
   // Keep titlebar on top after every layout
   layoutTitlebar();
@@ -133,6 +141,16 @@ function createViews(role) {
     return;
   }
   viewsCreated = true;
+
+  // Phase 13: Card browser (spells & items) on left
+  cardBrowserView = new BrowserView({
+    webPreferences: {
+      preload: path.join(__dirname, 'preload-main.js'),
+      contextIsolation: true, nodeIntegration: false,
+    },
+  });
+  mainWindow.addBrowserView(cardBrowserView);
+  cardBrowserView.webContents.loadFile(path.join(__dirname, 'renderer', 'card-browser.html'));
 
   // Discord strip placeholder
   discordView = new BrowserView({
