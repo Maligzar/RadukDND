@@ -314,9 +314,50 @@ function registerIpcHandlers() {
 
   ipcMain.handle('initiative:add-combatant', (_, combatant) => {
     if (!activeSession || appRole !== 'dm') return { ok: false };
-    const info = db.upsertCombatant.run({ ...combatant, session_id: activeSession.id });
+    const count = campaignDb.prepare('SELECT COUNT(*) AS n FROM initiative WHERE session_id=?').get(activeSession.id).n;
+    const info = db.upsertCombatant.run({
+      session_id:       activeSession.id,
+      combatant_name:   combatant.combatant_name,
+      combatant_type:   combatant.combatant_type ?? 'player',
+      initiative_score: combatant.initiative_score ?? 0,
+      hp_current:       combatant.hp_current ?? 0,
+      hp_max:           combatant.hp_max     ?? 0,
+      ac:               combatant.ac         ?? 10,
+      sort_order:       combatant.sort_order ?? count,
+      monster_id:       combatant.monster_id ?? null,
+    });
     overlayView?.webContents.send('initiative:sync', db.getInitiative.all(activeSession.id));
     return { ok: true, id: info.lastInsertRowid };
+  });
+
+  ipcMain.handle('initiative:update', (_, { id, initiative_score, hp_current }) => {
+    if (!activeSession || appRole !== 'dm') return { ok: false };
+    if (initiative_score !== undefined) {
+      campaignDb.prepare('UPDATE initiative SET initiative_score=? WHERE id=? AND session_id=?')
+        .run(initiative_score, id, activeSession.id);
+    }
+    if (hp_current !== undefined) {
+      campaignDb.prepare('UPDATE initiative SET hp_current=? WHERE id=? AND session_id=?')
+        .run(hp_current, id, activeSession.id);
+    }
+    overlayView?.webContents.send('initiative:sync', db.getInitiative.all(activeSession.id));
+    return { ok: true };
+  });
+
+  ipcMain.handle('initiative:remove', (_, { id }) => {
+    if (!activeSession || appRole !== 'dm') return { ok: false };
+    campaignDb.prepare('DELETE FROM initiative WHERE id=? AND session_id=?').run(id, activeSession.id);
+    overlayView?.webContents.send('initiative:sync', db.getInitiative.all(activeSession.id));
+    return { ok: true };
+  });
+
+  ipcMain.on('initiative:sort', () => {
+    if (!activeSession || appRole !== 'dm') return;
+    const rows   = db.getInitiative.all(activeSession.id);
+    const sorted = [...rows].sort((a, b) => b.initiative_score - a.initiative_score);
+    const stmt   = campaignDb.prepare('UPDATE initiative SET sort_order=? WHERE id=?');
+    campaignDb.transaction(() => sorted.forEach((r, i) => stmt.run(i, r.id)))();
+    overlayView?.webContents.send('initiative:sync', db.getInitiative.all(activeSession.id));
   });
 
   ipcMain.on('initiative:clear', () => {

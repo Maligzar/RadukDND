@@ -107,23 +107,40 @@
 
   /* Initiative */
   .init-row {
-    display: grid; grid-template-columns: 28px 1fr auto;
-    align-items: center; gap: 6px; padding: 4px 8px;
+    display: grid; grid-template-columns: 28px 1fr 26px 62px 16px;
+    align-items: center; gap: 4px; padding: 4px 6px 4px 8px;
     border-bottom: 1px solid rgba(74,60,40,0.25);
-    cursor: pointer; transition: background 0.1s;
+    cursor: default; transition: background 0.1s; position: relative;
   }
   .init-row:hover { background: rgba(200,146,42,0.04); }
-  .init-row.active-turn { background: rgba(140,26,26,0.10); border-left: 2px solid #cc2a2a; }
+  .init-row.active-turn { background: rgba(140,26,26,0.10); border-left: 3px solid #cc2a2a; padding-left: 5px; }
+  .init-row.dead { opacity: 0.45; }
   .init-num { font-family: 'Cinzel', serif; font-size: 15px; font-weight: 600; color: #c8922a; text-align: center; }
   .init-name { font-size: 12px; color: #e8dcc8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .init-type { font-size: 10px; color: #705a3a; margin-top: 1px; }
-  .hp-wrap { min-width: 56px; text-align: right; }
-  .hp-label { font-size: 9px; color: #705a3a; margin-bottom: 2px; font-family: monospace; }
+  .init-type { font-size: 9px; color: #705a3a; margin-top: 1px; }
+  .init-ac {
+    font-family: 'Cinzel', serif; font-size: 10px; color: #705a3a;
+    text-align: center; white-space: nowrap;
+  }
+  .init-ac span { display: block; font-size: 7px; color: #4a3820; letter-spacing: 0.06em; }
+  .hp-wrap { min-width: 56px; }
+  .hp-label {
+    font-size: 9px; color: #705a3a; margin-bottom: 2px; font-family: monospace;
+    cursor: pointer; transition: color 0.12s; text-align: right;
+  }
+  .hp-label:hover { color: #c8922a; }
   .hp-track { height: 3px; background: #1e1916; border: 1px solid #4a3c28; }
   .hp-fill  { height: 100%; transition: width 0.3s; }
   .hp-full  { background: #2a7a2a; }
   .hp-mid   { background: #b07820; }
   .hp-low   { background: #8c1a1a; }
+  .rm-btn {
+    background: none; border: none; color: #3a2e1e;
+    cursor: pointer; font-size: 11px; padding: 0; line-height: 1;
+    transition: color 0.12s; opacity: 0;
+  }
+  .init-row:hover .rm-btn { opacity: 1; }
+  .rm-btn:hover { color: #cc2a2a; }
   .init-empty {
     padding: 12px; text-align: center; font-family: 'Cinzel', serif;
     font-size: 10px; color: #4a3820; letter-spacing: 0.08em; text-transform: uppercase;
@@ -131,14 +148,15 @@
 
   /* Action bar */
   .init-actions {
-    display: flex; gap: 4px; padding: 5px 8px;
+    display: flex; gap: 3px; padding: 5px 6px;
     background: #0f0d0a; border-top: 1px solid rgba(74,60,40,0.3); flex-shrink: 0;
+    flex-wrap: wrap;
   }
   .act-btn {
     flex: 1; background: #1e1916; border: 1px solid #4a3c28; color: #a08060;
     font-family: 'Cinzel', serif; font-size: 9px; font-weight: 600;
-    letter-spacing: 0.08em; text-transform: uppercase; padding: 5px 4px;
-    cursor: pointer; transition: all 0.12s; white-space: nowrap;
+    letter-spacing: 0.06em; text-transform: uppercase; padding: 5px 3px;
+    cursor: pointer; transition: all 0.12s; white-space: nowrap; min-width: 0;
   }
   .act-btn:hover        { border-color: #c8922a; color: #e8dcc8; background: #252019; }
   .act-btn.danger:hover { border-color: #8c1a1a; color: #cc2a2a; background: rgba(140,26,26,0.12); }
@@ -160,7 +178,7 @@
   }
   .add-input:focus { border-color: #c8922a; }
   .add-input::placeholder { color: #4a3820; font-size: 11px; }
-  .add-input.narrow { width: 52px; flex: none; }
+  .add-input.narrow { width: 46px; flex: none; }
   .add-submit {
     background: #8c1a1a; border: 1px solid #b02020; color: #e8b84a;
     font-family: 'Cinzel', serif; font-size: 9px; font-weight: 600;
@@ -262,17 +280,21 @@
 <div class="panel-hdr neutral">
   <div class="gem gold"></div>
   <span class="panel-title">Initiative</span>
-  <span id="turn-counter" style="font-family:'Cinzel',serif;font-size:9px;color:#705a3a;letter-spacing:0.06em;"></span>
+  <span id="round-counter" style="font-family:'Cinzel',serif;font-size:9px;color:#c8922a;letter-spacing:0.06em;margin-right:4px;"></span>
+  <span id="turn-counter"  style="font-family:'Cinzel',serif;font-size:9px;color:#705a3a;letter-spacing:0.06em;"></span>
 </div>
 
-<div class="scroll-body" id="init-list" style="flex:0.9;max-height:200px;">
+<div class="scroll-body" id="init-list" style="flex:0.9;max-height:220px;">
   <div class="init-empty" id="init-empty">No combat active</div>
 </div>
 
 <div class="init-actions">
-  <button class="act-btn primary" id="btn-next-turn">&#9654; Next Turn</button>
+  <button class="act-btn"         id="btn-prev-turn">&#9664; Prev</button>
+  <button class="act-btn primary" id="btn-next-turn">&#9654; Next</button>
   <button class="act-btn"         id="btn-add">+ Add</button>
-  <button class="act-btn danger"  id="btn-clear">&#10005; Clear</button>
+  <button class="act-btn"         id="btn-roll-all">⚄ Roll</button>
+  <button class="act-btn"         id="btn-sort">&#8597; Sort</button>
+  <button class="act-btn danger"  id="btn-clear">&#10005;</button>
 </div>
 
 <div id="add-form">
@@ -280,14 +302,16 @@
     <input class="add-input"        id="add-name" placeholder="Name" autocomplete="off" spellcheck="false">
     <input class="add-input narrow" id="add-init" placeholder="Init" type="number" min="-5" max="40">
     <input class="add-input narrow" id="add-hp"   placeholder="HP"   type="number" min="0"  max="999">
+    <input class="add-input narrow" id="add-ac"   placeholder="AC"   type="number" min="1"  max="30">
   </div>
   <div class="form-row">
     <select class="add-input" id="add-type" style="font-size:11px;color:#a08060;">
-      <option value="pc">PC</option>
-      <option value="npc">NPC</option>
-      <option value="monster">Monster</option>
+      <option value="player">Player</option>
+      <option value="enemy">Enemy</option>
+      <option value="ally">Ally</option>
+      <option value="neutral">Neutral</option>
     </select>
-    <button class="add-submit" id="btn-add-submit">Add to Tracker</button>
+    <button class="add-submit" id="btn-add-submit">Add to Combat</button>
   </div>
 </div>
 
@@ -310,6 +334,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   let initiativeList = [];
   let addFormOpen    = false;
+  let roundNum       = 0; // 0 = no combat, 1+ = active round
 
   // ── Helpers ──────────────────────────────────────────────────
   function formatTime(ms) {
@@ -367,37 +392,78 @@ window.addEventListener('DOMContentLoaded', () => {
   // ── Initiative rendering ─────────────────────────────────────
   function renderInitiative(list) {
     initiativeList = list || [];
-    const container = document.getElementById('init-list');
-    const counter   = document.getElementById('turn-counter');
+    const container    = document.getElementById('init-list');
+    const roundEl      = document.getElementById('round-counter');
+    const turnEl       = document.getElementById('turn-counter');
 
     if (!initiativeList.length) {
       container.innerHTML = '<div class="init-empty">No combat active</div>';
-      if (counter) counter.textContent = '';
+      if (roundEl) roundEl.textContent = '';
+      if (turnEl)  turnEl.textContent  = '';
       return;
     }
 
     const activeIdx = initiativeList.findIndex(c => c.is_active_turn);
-    if (counter) counter.textContent = activeIdx >= 0
+    if (roundEl) roundEl.textContent = roundNum > 0 ? `Round ${roundNum}` : '';
+    if (turnEl)  turnEl.textContent  = activeIdx >= 0
       ? `Turn ${activeIdx + 1}/${initiativeList.length}` : '';
 
-    container.innerHTML = initiativeList.map(c => {
-      const pct   = c.hp_max > 0 ? Math.max(0, Math.min(100, (c.hp_current / c.hp_max) * 100)) : 0;
-      const cls   = pct > 50 ? 'hp-full' : pct > 25 ? 'hp-mid' : 'hp-low';
-      const hpHtml = c.hp_max > 0
-        ? `<div class="hp-wrap"><div class="hp-label">${c.hp_current ?? '?'}/${c.hp_max}</div><div class="hp-track"><div class="hp-fill ${cls}" style="width:${pct}%"></div></div></div>`
-        : '<div></div>';
-      return `<div class="init-row${c.is_active_turn ? ' active-turn' : ''}" data-id="${c.id}">
-        <div class="init-num">${c.initiative ?? '—'}</div>
-        <div><div class="init-name">${esc(c.combatant_name)}</div><div class="init-type">${esc(c.combatant_type ?? '')}</div></div>
-        ${hpHtml}
-      </div>`;
-    }).join('');
+    container.innerHTML = '';
+    initiativeList.forEach(c => {
+      const isDead  = c.hp_max > 0 && c.hp_current <= 0;
+      const pct     = c.hp_max > 0 ? Math.max(0, Math.min(100, (c.hp_current / c.hp_max) * 100)) : 0;
+      const hpCls   = pct > 50 ? 'hp-full' : pct > 25 ? 'hp-mid' : 'hp-low';
+      const typeMap  = { player: 'PC', enemy: 'Enemy', ally: 'Ally', neutral: 'NPC' };
+      const typeLabel = typeMap[c.combatant_type] ?? c.combatant_type ?? '';
 
-    container.querySelectorAll('.init-row').forEach(row => {
-      row.addEventListener('click', () =>
-        api.send('initiative:set-turn', { id: parseInt(row.dataset.id, 10) })
-      );
+      const row = document.createElement('div');
+      row.className = `init-row${c.is_active_turn ? ' active-turn' : ''}${isDead ? ' dead' : ''}`;
+      row.dataset.id = c.id;
+      row.innerHTML = `
+        <div class="init-num">${c.initiative_score ?? '—'}</div>
+        <div>
+          <div class="init-name">${esc(c.combatant_name)}${isDead ? ' ☠' : ''}</div>
+          <div class="init-type">${typeLabel}</div>
+        </div>
+        <div class="init-ac">${c.ac ?? 10}<span>AC</span></div>
+        <div class="hp-wrap">
+          <div class="hp-label" data-id="${c.id}" data-hp="${c.hp_current}" data-max="${c.hp_max}" title="Click to edit HP">
+            ${c.hp_max > 0 ? `${c.hp_current ?? 0}/${c.hp_max}` : '—'}
+          </div>
+          ${c.hp_max > 0
+            ? `<div class="hp-track"><div class="hp-fill ${hpCls}" style="width:${pct}%"></div></div>`
+            : ''}
+        </div>
+        <button class="rm-btn" data-id="${c.id}" title="Remove">✕</button>`;
+
+      row.addEventListener('click', e => {
+        if (e.target.classList.contains('rm-btn') || e.target.classList.contains('hp-label')) return;
+        api.send('initiative:set-turn', { id: c.id });
+      });
+
+      row.querySelector('.hp-label').addEventListener('click', () => editHp(c));
+      row.querySelector('.rm-btn').addEventListener('click', () => removeCombatant(c.id));
+
+      container.appendChild(row);
     });
+  }
+
+  function editHp(c) {
+    const val = window.prompt(`HP for ${c.combatant_name} (current: ${c.hp_current}/${c.hp_max})\nEnter new value or +/-delta (e.g. -5, +10):`, c.hp_current);
+    if (val === null) return;
+    let newHp;
+    if (/^[+-]/.test(val.trim())) {
+      newHp = (c.hp_current ?? 0) + parseInt(val, 10);
+    } else {
+      newHp = parseInt(val, 10);
+    }
+    if (isNaN(newHp)) return;
+    newHp = Math.max(0, Math.min(c.hp_max || 999, newHp));
+    api.invoke('initiative:update', { id: c.id, hp_current: newHp }).catch(console.error);
+  }
+
+  async function removeCombatant(id) {
+    try { await api.invoke('initiative:remove', { id }); } catch (e) { console.error(e); }
   }
 
   // ── Stats panel ──────────────────────────────────────────────
@@ -482,14 +548,43 @@ window.addEventListener('DOMContentLoaded', () => {
   // ── Button wiring ────────────────────────────────────────────
   document.getElementById('btn-next-turn').addEventListener('click', () => {
     if (!initiativeList.length) return;
-    const cur  = initiativeList.findIndex(c => c.is_active_turn);
-    const next = initiativeList[(cur + 1) % initiativeList.length];
-    api.send('initiative:set-turn', { id: next.id });
+    const cur   = initiativeList.findIndex(c => c.is_active_turn);
+    const nextI = (cur + 1) % initiativeList.length;
+    if (nextI === 0 && initiativeList.length > 0) {
+      // Wrapped — new round
+      roundNum = roundNum <= 0 ? 1 : roundNum + 1;
+    } else if (roundNum <= 0) {
+      roundNum = 1;
+    }
+    api.send('initiative:set-turn', { id: initiativeList[nextI].id });
+  });
+
+  document.getElementById('btn-prev-turn').addEventListener('click', () => {
+    if (!initiativeList.length) return;
+    const cur   = initiativeList.findIndex(c => c.is_active_turn);
+    const prevI = (cur - 1 + initiativeList.length) % initiativeList.length;
+    api.send('initiative:set-turn', { id: initiativeList[prevI].id });
+  });
+
+  document.getElementById('btn-sort').addEventListener('click', () => {
+    api.send('initiative:sort');
+  });
+
+  document.getElementById('btn-roll-all').addEventListener('click', async () => {
+    if (!initiativeList.length) return;
+    for (const c of initiativeList) {
+      const roll = Math.floor(Math.random() * 20) + 1;
+      await api.invoke('initiative:update', { id: c.id, initiative_score: roll }).catch(console.error);
+    }
+    api.send('initiative:sort');
+    if (roundNum <= 0) roundNum = 1;
   });
 
   document.getElementById('btn-clear').addEventListener('click', () => {
-    if (window.confirm('Clear all initiative — end combat?'))
+    if (window.confirm('Clear all initiative — end combat?')) {
       api.send('initiative:clear');
+      roundNum = 0;
+    }
   });
 
   document.getElementById('btn-add').addEventListener('click', () => {
@@ -502,17 +597,19 @@ window.addEventListener('DOMContentLoaded', () => {
     const name = document.getElementById('add-name').value.trim();
     const init = parseInt(document.getElementById('add-init').value, 10);
     const hp   = parseInt(document.getElementById('add-hp').value, 10);
+    const ac   = parseInt(document.getElementById('add-ac').value, 10);
     const type = document.getElementById('add-type').value;
     if (!name) { document.getElementById('add-name').focus(); return; }
     try {
       await api.invoke('initiative:add-combatant', {
-        combatant_name: name, combatant_type: type,
-        initiative: isNaN(init) ? 0 : init,
-        hp_current: isNaN(hp) ? 0 : hp,
-        hp_max:     isNaN(hp) ? 0 : hp,
-        is_active_turn: 0,
+        combatant_name:   name,
+        combatant_type:   type,
+        initiative_score: isNaN(init) ? 0 : init,
+        hp_current:       isNaN(hp) ? 0 : hp,
+        hp_max:           isNaN(hp) ? 0 : hp,
+        ac:               isNaN(ac) ? 10 : ac,
       });
-      ['add-name','add-init','add-hp'].forEach(id => document.getElementById(id).value = '');
+      ['add-name','add-init','add-hp','add-ac'].forEach(id => document.getElementById(id).value = '');
       document.getElementById('add-name').focus();
     } catch (e) { console.error('[overlay-dm] add-combatant failed:', e); }
   }
