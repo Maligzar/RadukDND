@@ -514,6 +514,10 @@ function registerIpcHandlers() {
   ipcMain.handle('ddb:switch-character', async (_, { characterUrl }) => {
     if (!activeSession || appRole !== 'dm' || !ddbView) return { ok: false };
 
+    if (typeof characterUrl !== 'string' || !characterUrl.startsWith('https://www.dndbeyond.com/')) {
+      return { ok: false, error: 'URL must be a D&D Beyond character URL' };
+    }
+
     try {
       ddbView.webContents.loadURL(characterUrl);
       campaignDb.prepare('UPDATE sessions SET ddb_character_url=? WHERE id=?')
@@ -529,9 +533,7 @@ function registerIpcHandlers() {
   // ── Phase 17: Receive character info from DDB preload ──────
   ipcMain.on('ddb:character-info', (_, info) => {
     if (!activeSession || appRole !== 'dm') return;
-    console.log('[main] DDB character info received:', info);
     if (info.name || info.url) {
-      const updates = {};
       if (info.url && !activeSession.ddb_character_url) {
         campaignDb.prepare('UPDATE sessions SET ddb_character_url=? WHERE id=?')
           .run(info.url, activeSession.id);

@@ -658,17 +658,18 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   document.getElementById('btn-switch-char').addEventListener('click', async () => {
-    const url = document.getElementById('char-url-input').value.trim();
-    if (!url) {
-      console.warn('[overlay-dm] Character URL is empty');
-      return;
-    }
+    const input = document.getElementById('char-url-input');
+    const url = input.value.trim();
+    if (!url) return;
+
     try {
       const result = await api.invoke('ddb:switch-character', { characterUrl: url });
       if (result.ok) {
-        document.getElementById('char-url-input').value = '';
-        console.log('[overlay-dm] Character switched successfully');
+        input.value = '';
+        input.style.borderColor = '';
+        document.getElementById('char-name').textContent = 'Loading...';
       } else {
+        input.style.borderColor = '#8c1a1a';
         console.error('[overlay-dm] Failed to switch character:', result.error);
       }
     } catch (e) { console.error('[overlay-dm] ddb:switch-character failed:', e); }

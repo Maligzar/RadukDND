@@ -265,11 +265,11 @@ function migrateIfNeeded(db, label) {
   const currentVersion = db.pragma('user_version', { simple: true });
 
   const migrations = [
-    // v1 → baseline, nothing to run (tables created above)
+    // v0 → v1: baseline, nothing to run (tables created above)
+    null,
     // v1 → v2: Phase 17 — add ddb_character_url column to sessions
     (db) => {
       db.exec(`ALTER TABLE sessions ADD COLUMN ddb_character_url TEXT;`);
-      console.log('[db] Added ddb_character_url column to sessions table');
     },
   ];
 
