@@ -19,7 +19,6 @@ let titlebarView    = null; // always-on-top full-width title bar
 let cardBrowserView = null; // Phase 13: card browser (spells/items) on left
 let ddbView         = null;
 let roll20View      = null;
-let discordView     = null;
 let overlayView     = null;
 
 // Phase 10: guard against duplicate createViews() calls
@@ -27,10 +26,8 @@ let viewsCreated = false;
 let activeView   = 'ddb'; // 'ddb' | 'roll20'
 
 const HEADER_H       = 34;
-const DISCORD_H      = 160;
 const SIDEBAR_W      = 260;
 const CARD_BROWSER_W = 80; // Phase 13: collapsible card browser (left sidebar)
-let discordStripH    = DISCORD_H;
 
 // ─────────────────────────────────────────────────────────────
 // App ready
@@ -106,7 +103,7 @@ function layoutViews() {
   if (!mainWindow || !appRole) return;
 
   const [winW, winH] = mainWindow.getContentSize();
-  const contentTop   = HEADER_H + discordStripH;
+  const contentTop   = HEADER_H;
   const contentH     = winH - contentTop;
   const mainW        = winW - SIDEBAR_W - CARD_BROWSER_W;
   const sidebarH     = winH - HEADER_H;
@@ -115,9 +112,6 @@ function layoutViews() {
   if (cardBrowserView) {
     cardBrowserView.setBounds({ x: 0, y: HEADER_H, width: CARD_BROWSER_W, height: sidebarH });
   }
-
-  // Discord strip spans full width below the titlebar
-  if (discordView) discordView.setBounds({ x: 0, y: HEADER_H, width: winW, height: discordStripH });
 
   // Main content shifted right by card browser width
   const showBounds = { x: CARD_BROWSER_W, y: contentTop, width: mainW, height: contentH };
@@ -166,16 +160,6 @@ function createViews(role) {
       : path.join(__dirname, 'renderer', 'overlay-player.html')
   );
 
-  // Discord strip placeholder
-  discordView = new BrowserView({
-    webPreferences: {
-      preload: path.join(__dirname, 'preload-main.js'),
-      contextIsolation: true, nodeIntegration: false,
-    },
-  });
-  mainWindow.addBrowserView(discordView);
-  discordView.webContents.loadFile(path.join(__dirname, 'renderer', 'discord-strip.html'));
-
   // D&D Beyond
   ddbView = new BrowserView({
     webPreferences: {
@@ -204,11 +188,6 @@ function createViews(role) {
     titlebarView?.webContents.send('view:active', {
       view: activeView,
       sessionCode: activeSession?.code ?? null,
-    });
-    discordView?.webContents.send('session:info', {
-      sessionCode:   activeSession?.code ?? null,
-      characterName: activeSession?.characterName ?? null,
-      playerName:    activeSession?.playerName    ?? null,
     });
   }, 500);
 }
@@ -279,8 +258,6 @@ function registerIpcHandlers() {
       rolled_at: payload.rolled_at ?? Date.now(),
     };
     db.insertRoll.run(roll);
-    const stats = db.getSessionStats.get(activeSession.id);
-    discordView?.webContents.send('stats:update', stats);
     if (roll.is_secret) return;
     if (overlayView) {
       overlayView.webContents.send('roll:display', {
@@ -389,12 +366,6 @@ function registerIpcHandlers() {
   ipcMain.on('view:switch', (_, { view }) => {
     if (!viewsCreated) return;
     activeView = view;
-    layoutViews();
-  });
-
-  // ── Discord strip resize ───────────────────────────────────
-  ipcMain.on('discord:resize', (_, { height }) => {
-    discordStripH = Math.max(60, Math.min(320, height));
     layoutViews();
   });
 

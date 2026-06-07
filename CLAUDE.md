@@ -1,9 +1,9 @@
 # DM Command Center — Elminster Edition
-## Project Documentation & Phase 11 Implementation Plan
+## Project Documentation & Phase 12+ Implementation Plan
 
-**Project Goal:** Electron desktop app for D&D session management with multi-player support, roll bridging, and initiative tracking.
+**Project Goal:** Electron desktop app for D&D session management with multi-player support, roll bridging, and initiative tracking. **Discord integration removed** — focus is on portability and core combat UX.
 
-**Current Phase:** 11 (Relay Server Integration)
+**Current Phase:** 12 (Initiative Tracker - Complete)
 
 ---
 
@@ -12,10 +12,10 @@
 ### High-Level Overview
 ```
 Electron Main (main.js)
-  ├─ Discord WebContentsView
   ├─ D&D Beyond WebContentsView (with preload-ddb.js for roll capture)
   ├─ Roll20 WebContentsView (with preload-r20.js for HP tracking)
   └─ Overlay WebContentsView (local HTML + preload-main.js for IPC)
+       ├─ Card Browser (Spells & Items)
        ├─ Initiative Tracker
        ├─ Roll Display
        └─ Combat Controls
@@ -24,7 +24,7 @@ Databases (SQLite)
   ├─ campaign.db — sessions, rolls, initiative, combatants
   └─ bestiary.db — monster data for encounter generation
 
-External Relay (Google Cloud)
+External Relay (Google Cloud) — Optional for multi-player
   └─ Socket.io server at 34.31.125.161
        ├─ Room management by session_code
        ├─ Broadcast rolls, HP, initiative
@@ -32,13 +32,14 @@ External Relay (Google Cloud)
 ```
 
 ### Key Files
-- **src/main.js** — Electron main, IPC handlers, view layout, DB queries
-- **src/preload-main.js** — Exposes ipcRenderer to overlay
-- **src/preload-ddb.js** — Intercepts D&D Beyond rolls (DOM events, MutationObserver, fetch hooks)
-- **src/preload-r20.js** — Captures Roll20 HP updates
+- **main.js** — Electron main, IPC handlers, view layout, DB queries
+- **preload-main.js** — Exposes ipcRenderer to overlay
+- **preload-ddb.js** — Intercepts D&D Beyond rolls (DOM events, MutationObserver, fetch hooks)
+- **preload-r20.js** — Captures Roll20 HP updates
 - **renderer/index.html** — Role picker UI
 - **renderer/overlay-dm.html** / **overlay-player.html** — Combat UIs
-- **src/db/db-init.js** — SQLite schema + prepared statements
+- **renderer/card-browser.html** / **card-browser.js** — Spell/item browser
+- **db/db-init.js** — SQLite schema + prepared statements
 
 ### Database Schema
 ```sql
