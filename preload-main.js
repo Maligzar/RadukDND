@@ -28,6 +28,7 @@ const ALLOWED_SEND = new Set([
 // Channels the renderer is allowed to INVOKE (request/response)
 const ALLOWED_INVOKE = new Set([
   'session:set-role',
+  'session:get',
   'rolls:get',
   'initiative:get',
   'initiative:add-combatant',

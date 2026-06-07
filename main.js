@@ -245,6 +245,12 @@ function registerIpcHandlers() {
     return { ok: true, session: activeSession };
   });
 
+  // ── Phase 16: Get current session info for onboarding ──────
+  ipcMain.handle('session:get', () => {
+    if (!activeSession) return null;
+    return campaignDb.prepare('SELECT * FROM sessions WHERE id=?').get(activeSession.id);
+  });
+
   // ── Roll capture ───────────────────────────────────────────
   ipcMain.on('roll:captured', (_, payload) => {
     if (!activeSession) return;
