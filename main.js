@@ -509,6 +509,37 @@ function registerIpcHandlers() {
     recapWin.loadFile(path.join(__dirname, 'renderer', 'recap.html'));
     recapWin.setMenuBarVisibility(false);
   });
+
+  // ── Phase 17: Switch D&D Beyond character ──────────────────
+  ipcMain.handle('ddb:switch-character', async (_, { characterUrl }) => {
+    if (!activeSession || appRole !== 'dm' || !ddbView) return { ok: false };
+
+    try {
+      ddbView.webContents.loadURL(characterUrl);
+      campaignDb.prepare('UPDATE sessions SET ddb_character_url=? WHERE id=?')
+        .run(characterUrl, activeSession.id);
+      console.log('[main] Switched to character URL:', characterUrl);
+      return { ok: true };
+    } catch (err) {
+      console.error('[main] Failed to switch character:', err);
+      return { ok: false, error: err.message };
+    }
+  });
+
+  // ── Phase 17: Receive character info from DDB preload ──────
+  ipcMain.on('ddb:character-info', (_, info) => {
+    if (!activeSession || appRole !== 'dm') return;
+    console.log('[main] DDB character info received:', info);
+    if (info.name || info.url) {
+      const updates = {};
+      if (info.url && !activeSession.ddb_character_url) {
+        campaignDb.prepare('UPDATE sessions SET ddb_character_url=? WHERE id=?')
+          .run(info.url, activeSession.id);
+        activeSession.ddb_character_url = info.url;
+      }
+      overlayView?.webContents.send('ddb:character-info', info);
+    }
+  });
 }
 
 function generateSessionCode() {

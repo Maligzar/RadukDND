@@ -133,9 +133,52 @@ const observer = new MutationObserver((mutations) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────
+// Phase 17: Character info extraction
+// ─────────────────────────────────────────────────────────────
+
+function extractCharacterInfo() {
+  const info = {
+    name: null,
+    class: null,
+    level: null,
+    url: window.location.href,
+  };
+
+  try {
+    const nameEl = document.querySelector('[class*="CharacterName"]');
+    if (nameEl) {
+      info.name = nameEl.textContent?.trim();
+    }
+
+    const levelEl = document.querySelector('[class*="Level"]');
+    if (levelEl) {
+      const levelText = levelEl.textContent?.match(/\d+/)?.[0];
+      if (levelText) info.level = parseInt(levelText, 10);
+    }
+
+    const classEl = document.querySelector('[class*="Class"]');
+    if (classEl) {
+      info.class = classEl.textContent?.trim();
+    }
+  } catch (err) {
+    console.log('[DDB Preload] Character info extraction error:', err.message);
+  }
+
+  return info;
+}
+
 function startObserver() {
   observer.observe(document.body, { childList: true, subtree: true });
   console.log('[DDB Preload] Active — watching for roll toasts (NotRoot)');
+
+  setTimeout(() => {
+    const info = extractCharacterInfo();
+    if (info.name || info.url) {
+      console.log('[DDB Preload] Character info:', info);
+      ipcRenderer.send('ddb:character-info', info);
+    }
+  }, 1000);
 }
 
 if (document.readyState === 'loading') {

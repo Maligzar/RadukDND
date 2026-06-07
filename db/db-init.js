@@ -4,7 +4,7 @@ const path    = require('path');
 const fs      = require('fs');
 const Database = require('better-sqlite3');
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 function getCampaignDbPath(app) {
   return path.join(app.getPath('userData'), 'campaign.db');
@@ -266,6 +266,11 @@ function migrateIfNeeded(db, label) {
 
   const migrations = [
     // v1 → baseline, nothing to run (tables created above)
+    // v1 → v2: Phase 17 — add ddb_character_url column to sessions
+    (db) => {
+      db.exec(`ALTER TABLE sessions ADD COLUMN ddb_character_url TEXT;`);
+      console.log('[db] Added ddb_character_url column to sessions table');
+    },
   ];
 
   for (let v = currentVersion; v < SCHEMA_VERSION; v++) {

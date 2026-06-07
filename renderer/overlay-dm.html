@@ -265,6 +265,22 @@
 
 <div class="divider"></div>
 
+<!-- Phase 17: Character Switcher panel -->
+<div class="panel-hdr neutral">
+  <div class="gem gold"></div>
+  <span class="panel-title">D&D Beyond Character</span>
+</div>
+<div id="char-switcher" style="padding:8px;background:#1e1810;border-bottom:1px solid rgba(74,60,40,0.3);flex-shrink:0;">
+  <div id="current-char" style="font-size:11px;color:#c9b08a;margin-bottom:6px;min-height:18px;">
+    <span style="color:#705a3a;font-size:9px;">Character: </span><span id="char-name" style="color:#e8b84a;">Loading...</span>
+  </div>
+  <input type="text" id="char-url-input" placeholder="https://dndbeyond.com/characters/..."
+    style="width:100%;padding:4px;background:#0d0b08;color:#c9b08a;border:1px solid #4a3c28;font-size:10px;margin-bottom:4px;font-family:'Courier New',monospace;">
+  <button id="btn-switch-char" style="width:100%;padding:4px;background:#1e1810;color:#c8922a;border:1px solid #3a2e1e;font-family:'Cinzel',serif;font-size:9px;letter-spacing:0.06em;text-transform:uppercase;cursor:pointer;transition:all 0.12s;">Switch Character</button>
+</div>
+
+<div class="divider"></div>
+
 <!-- Session stats panel -->
 <div class="panel-hdr neutral" id="stats-hdr" style="cursor:pointer;" title="Toggle stats">
   <div class="gem gold"></div>
@@ -630,6 +646,32 @@ window.addEventListener('DOMContentLoaded', () => {
     api.send('session:end');
     document.getElementById('status-text').textContent = 'Session ended';
     document.getElementById('relay-pip').classList.add('offline');
+  });
+
+  // ── Phase 17: Character Switcher ──────────────────────────────
+  let currentCharInfo = { name: null, url: null };
+
+  api.on('ddb:character-info', (info) => {
+    currentCharInfo = info;
+    const nameEl = document.getElementById('char-name');
+    if (nameEl) nameEl.textContent = info.name || 'Unknown';
+  });
+
+  document.getElementById('btn-switch-char').addEventListener('click', async () => {
+    const url = document.getElementById('char-url-input').value.trim();
+    if (!url) {
+      console.warn('[overlay-dm] Character URL is empty');
+      return;
+    }
+    try {
+      const result = await api.invoke('ddb:switch-character', { characterUrl: url });
+      if (result.ok) {
+        document.getElementById('char-url-input').value = '';
+        console.log('[overlay-dm] Character switched successfully');
+      } else {
+        console.error('[overlay-dm] Failed to switch character:', result.error);
+      }
+    } catch (e) { console.error('[overlay-dm] ddb:switch-character failed:', e); }
   });
 
   // ── Bootstrap ────────────────────────────────────────────────

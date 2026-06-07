@@ -3,7 +3,7 @@
 
 **Project Goal:** Electron desktop app for D&D session management with multi-player support, roll bridging, and initiative tracking. **Discord integration removed** — focus is on portability and core combat UX.
 
-**Current Phase:** 15 (Session Recap - Complete)
+**Current Phase:** 17 (Character URL Switcher - Complete)
 
 ---
 
@@ -50,7 +50,8 @@ CREATE TABLE sessions (
   dm_name TEXT,
   started_at INTEGER,
   party_level INTEGER,
-  party_size INTEGER
+  party_size INTEGER,
+  ddb_character_url TEXT  -- Phase 17: D&D Beyond character URL
 );
 
 -- rolls
@@ -255,14 +256,65 @@ socket.on('player:left', (playerCount) => {...});
 
 ---
 
+## Phase 17: Character URL Switcher
+
+### Objectives
+1. **Mid-session character switching** — Allow DM to switch D&D Beyond characters without restarting
+2. **Character info extraction** — Extract character name, class, level from DDB page
+3. **URL persistence** — Store character URL in session database
+4. **DM-only control** — Only DM can switch characters
+
+### Implementation
+
+#### Step 1: Database Migration
+- Add `ddb_character_url TEXT` column to sessions table
+- Increment SCHEMA_VERSION from 1 to 2
+- Migration runs automatically on first launch with new version
+
+#### Step 2: Enhanced preload-ddb.js
+- Extract character info from D&D Beyond DOM (name, class, level)
+- Send `ddb:character-info` IPC with extracted data
+- Triggered on page load with 1000ms delay to allow DOM settlement
+
+#### Step 3: IPC Handlers (main.js)
+| Handler | Trigger | Action |
+|---------|---------|--------|
+| `ddb:switch-character` | invoke from overlay | Load new character URL in ddbView, update session |
+| `ddb:character-info` | sent from preload | Store character info, broadcast to overlay |
+
+#### Step 4: Overlay UI (overlay-dm.html)
+- New "D&D Beyond Character" panel below rolls
+- Display current character name
+- Text input for character URL
+- "Switch Character" button
+
+### UI Workflow
+1. DM opens character sheet on D&D Beyond in browser
+2. Copies URL from address bar
+3. Pastes into character switcher input
+4. Clicks "Switch Character"
+5. App loads new URL in ddbView, extracts character info
+6. Character name updates in overlay
+
+### Test Plan
+- [ ] DM switches from one character to another mid-session
+- [ ] Character name displays correctly in overlay
+- [ ] Character URL stored in session database
+- [ ] New rolls from new character are captured
+- [ ] Initiative tracker unaffected by character switch
+
+---
+
 ## Phase 12+ Roadmap
 
-| Feature | Phase | Effort | Blocker |
-|---------|-------|--------|---------|
-| Discord Webhooks (critical hit alerts) | 12 | 1 week | None |
-| Character URL Switcher | 12 | 3 days | None |
-| Session Recap PDF Export | 13 | 1 week | None |
-| Player Onboarding (QR code share) | 13 | 1 week | None |
+| Feature | Phase | Status | Effort |
+|---------|-------|--------|--------|
+| Character URL Switcher | 17 | ✓ Complete | 3 days |
+| Session Recap PDF Export | 15 | ✓ Complete | 1 week |
+| Player Onboarding | 16 | ✓ Complete | 1 week |
+| Encounter Generator UI | 18 | Planned | 1 week |
+| Multi-player Relay Integration | 19 | Planned | 2 weeks |
+| Audio/Video Streaming | 20+ | Future | TBD |
 
 ---
 
@@ -296,6 +348,6 @@ Run two instances of the app:
 ---
 
 ## Current Status
-- **Phase:** 12 (Initiative Tracker Panel)
-- **Branch:** `master` (Phase 11 merged)
-- **Next:** Build initiative tracker UI, HP sync, turn management
+- **Phase:** 17 (Character URL Switcher)
+- **Branch:** `claude/phase17-character-switcher` (in progress)
+- **Next:** Merge Phase 17, then Phase 18 (Encounter Generator UI)
