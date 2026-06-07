@@ -3,7 +3,7 @@
 
 **Project Goal:** Electron desktop app for D&D session management with multi-player support, roll bridging, and initiative tracking. **Discord integration removed** — focus is on portability and core combat UX.
 
-**Current Phase:** 12 (Initiative Tracker - Complete)
+**Current Phase:** 14 (Roll20 HP Sync - In Progress)
 
 ---
 
@@ -207,6 +207,51 @@ socket.on('player:left', (playerCount) => {...});
 ### Database Updates (if needed)
 - `initiative` table already stores: id, session_id, combatant_name, initiative_roll, hp_current, hp_max, ac, is_active_turn
 - No schema changes needed
+
+---
+
+## Phase 14: Roll20 HP Sync
+
+### Objectives
+1. **Monitor token HP changes** — Detect when Roll20 tokens take damage
+2. **Parse damage from chat** — Extract damage numbers from damage rolls in chat
+3. **Auto-sync to initiative tracker** — Update combatant HP in real-time
+4. **Heal tracking** — Support healing spells that restore HP
+
+### Implementation
+
+#### Step 1: Enhanced preload-r20.js
+- **MutationObserver** on token layer — detect HP stat bubble changes
+- **Chat monitor** — parse damage/heal patterns from messages
+- **Character sheet** — track HP field edits on character sheets
+- **IPC channels:**
+  - `hp:r20-update` — token HP changes with token_name, hp_current, hp_max
+  - `damage:parsed` — damage/heal from chat with amount, target_name
+
+#### Step 2: IPC Handlers (main.js)
+| Handler | Trigger | Action |
+|---------|---------|--------|
+| `hp:r20-update` | Token HP changes | Match combatant by name, update HP, sync initiative |
+| `damage:parsed` | Chat damage roll | Auto-reduce HP, clamp to 0 |
+| `damage:parsed` | Chat heal | Auto-increase HP, clamp to max |
+
+#### Step 3: Matching Logic
+- **By combatant_name** — search initiative table for exact match
+- **Silent fail** — if no match, log warning (DM must add combatant manually)
+- **Auto-clamp** — damage can't go below 0, healing can't exceed max
+
+### Test Plan
+- [ ] Open Roll20 with a token
+- [ ] Reduce token HP via token stat — initiative tracker updates
+- [ ] Roll damage in Roll20 chat → "12 damage to Goblin" → Goblin HP decreases
+- [ ] Roll healing spell → HP increases (clamped to max)
+- [ ] Unknown target → logs warning, no crash
+- [ ] DM and player both see updated HP
+
+### Limitations & Future
+- **Name matching fragile** — fragmented HP might not match names (e.g., "Goblin 1" vs "Goblin")
+- **Chat parsing heuristic** — not 100% accurate for all sheet types
+- **No Roll20 API** — uses DOM observation (more resilient, works for all sheets)
 
 ---
 

@@ -277,6 +277,58 @@ function registerIpcHandlers() {
     overlayView?.webContents.send('hp:update', { combatant_name, hp_current });
   });
 
+  // ── Phase 14: HP update from Roll20 ────────────────────────
+  ipcMain.on('hp:r20-update', (_, { token_name, token_id, hp_current, hp_max }) => {
+    if (!activeSession) return;
+
+    // Try to find matching combatant by name
+    const combatant = campaignDb.prepare(
+      `SELECT id FROM initiative WHERE session_id=? AND combatant_name=? LIMIT 1`
+    ).get(activeSession.id, token_name);
+
+    if (combatant) {
+      // Update existing combatant
+      campaignDb.prepare(`UPDATE initiative SET hp_current=? WHERE id=? AND session_id=?`)
+        .run(hp_current, combatant.id, activeSession.id);
+
+      console.log(`[main] R20 HP sync: ${token_name} → ${hp_current}`);
+
+      // Broadcast update to overlay
+      overlayView?.webContents.send('hp:update', { combatant_name: token_name, hp_current });
+      overlayView?.webContents.send('initiative:sync', db.getInitiative.all(activeSession.id));
+    } else {
+      console.log(`[main] R20 HP update for unknown combatant: ${token_name}`);
+      // Could optionally auto-add combatant, but DM should add manually for control
+    }
+  });
+
+  // ── Phase 14: Damage parsing from chat ─────────────────────
+  ipcMain.on('damage:parsed', (_, { type, amount, target_name }) => {
+    if (!activeSession || appRole !== 'dm') return;
+
+    const combatant = campaignDb.prepare(
+      `SELECT id, hp_current, hp_max FROM initiative WHERE session_id=? AND combatant_name=? LIMIT 1`
+    ).get(activeSession.id, target_name);
+
+    if (combatant && type === 'damage') {
+      const newHp = Math.max(0, combatant.hp_current - amount);
+      campaignDb.prepare(`UPDATE initiative SET hp_current=? WHERE id=?`)
+        .run(newHp, combatant.id);
+
+      console.log(`[main] Chat damage: ${target_name} took ${amount} → ${newHp}/${combatant.hp_max}`);
+
+      overlayView?.webContents.send('initiative:sync', db.getInitiative.all(activeSession.id));
+    } else if (combatant && type === 'heal') {
+      const newHp = Math.min(combatant.hp_max, combatant.hp_current + amount);
+      campaignDb.prepare(`UPDATE initiative SET hp_current=? WHERE id=?`)
+        .run(newHp, combatant.id);
+
+      console.log(`[main] Chat heal: ${target_name} healed ${amount} → ${newHp}/${combatant.hp_max}`);
+
+      overlayView?.webContents.send('initiative:sync', db.getInitiative.all(activeSession.id));
+    }
+  });
+
   // ── Initiative ─────────────────────────────────────────────
   ipcMain.handle('initiative:get', () => {
     if (!activeSession) return [];
