@@ -3,7 +3,7 @@
 
 **Project Goal:** Electron desktop app for D&D session management with multi-player support, roll bridging, and initiative tracking. **Discord integration removed** — focus is on portability and core combat UX.
 
-**Current Phase:** 14 (Roll20 HP Sync - In Progress)
+**Current Phase:** 15 (Session Recap - Complete)
 
 ---
 
