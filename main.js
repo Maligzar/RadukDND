@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, BrowserWindow, BrowserView, ipcMain } = require('electron');
+const { app, BrowserWindow, BrowserView, ipcMain, shell } = require('electron');
 const path = require('path');
 const { openCampaignDb, openBestiaryDb, getStatements } = require('./db/db-init');
 
@@ -456,6 +456,52 @@ function registerIpcHandlers() {
     if (!activeSession || appRole !== 'dm') return;
     db.endSession.run({ id: activeSession.id, ended_at: Date.now() });
     activeSession = null;
+  });
+
+  // ── Phase 15: Session Recap data fetchers ─────────────────
+  ipcMain.handle('recap:get-rolls', () => {
+    if (!activeSession) return [];
+    return db.getAllRollsDM.all(activeSession.id);
+  });
+
+  ipcMain.handle('recap:get-stats', () => {
+    if (!activeSession) return {};
+    const id = activeSession.id;
+    return {
+      summary:      db.getSessionStats.get(id),
+      distribution: db.getRollDistribution.get(id),
+      topActions:   db.getTopActions.all(id),
+    };
+  });
+
+  ipcMain.handle('recap:get-initiative', () => {
+    if (!activeSession) return [];
+    return db.getInitiative.all(activeSession.id);
+  });
+
+  ipcMain.handle('recap:get-session', () => {
+    if (!activeSession) return {};
+    return campaignDb.prepare('SELECT * FROM sessions WHERE id=?').get(activeSession.id);
+  });
+
+  // Open recap in a new floating window (DM only)
+  ipcMain.on('recap:open', () => {
+    if (!activeSession || appRole !== 'dm') return;
+
+    const recapWin = new BrowserWindow({
+      width: 900, height: 800,
+      title: 'Session Recap',
+      backgroundColor: '#f5f0e8',
+      parent: mainWindow,
+      webPreferences: {
+        preload: path.join(__dirname, 'preload-main.js'),
+        contextIsolation: true,
+        nodeIntegration: false,
+      },
+    });
+
+    recapWin.loadFile(path.join(__dirname, 'renderer', 'recap.html'));
+    recapWin.setMenuBarVisibility(false);
   });
 }
 

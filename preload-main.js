@@ -15,9 +15,10 @@ const ALLOWED_SEND = new Set([
   'hp:update',
   'initiative:set-turn',
   'initiative:clear',
-  'discord:resize',
+  'initiative:sort',
   'view:switch',
   'session:end',
+  'recap:open',
   // Phase 10: window controls
   'window:exit',
   'window:fullscreen',
@@ -30,10 +31,17 @@ const ALLOWED_INVOKE = new Set([
   'rolls:get',
   'initiative:get',
   'initiative:add-combatant',
+  'initiative:update',
+  'initiative:remove',
   'bestiary:query',
   'bestiary:get-monster',
   'encounter:save',
   'stats:get',
+  // Phase 15: recap
+  'recap:get-rolls',
+  'recap:get-stats',
+  'recap:get-initiative',
+  'recap:get-session',
 ]);
 
 // Channels the renderer is allowed to RECEIVE from main

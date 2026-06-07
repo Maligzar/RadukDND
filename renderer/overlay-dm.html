@@ -318,6 +318,7 @@
 <div id="status-bar">
   <div class="pip" id="relay-pip" title="Relay connection"></div>
   <span class="status-text" id="status-text">DM Session</span>
+  <button class="session-end-btn" id="btn-recap" style="margin-right:4px;">⎙ Recap</button>
   <button class="session-end-btn" id="btn-end-session">End Session</button>
 </div>
 
@@ -617,6 +618,10 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-add-submit').addEventListener('click', addCombatant);
   document.getElementById('add-form').addEventListener('keydown', e => {
     if (e.key === 'Enter') addCombatant();
+  });
+
+  document.getElementById('btn-recap').addEventListener('click', () => {
+    api.send('recap:open');
   });
 
   document.getElementById('btn-end-session').addEventListener('click', () => {
