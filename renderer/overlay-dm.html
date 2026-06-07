@@ -318,6 +318,7 @@
 <div id="status-bar">
   <div class="pip" id="relay-pip" title="Relay connection"></div>
   <span class="status-text" id="status-text">DM Session</span>
+  <span id="session-code-display" style="font-family:'Cinzel',serif;font-size:9px;color:#c8922a;letter-spacing:0.06em;margin-left:auto;margin-right:8px;cursor:pointer;padding:2px 6px;border:1px solid #3a2e1e;border-radius:2px;transition:all 0.12s;" title="Click to copy">Code: <strong style="color:#e8b84a;">—</strong></span>
   <button class="session-end-btn" id="btn-recap" style="margin-right:4px;">⎙ Recap</button>
   <button class="session-end-btn" id="btn-end-session">End Session</button>
 </div>
@@ -632,7 +633,26 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   // ── Bootstrap ────────────────────────────────────────────────
+  // Phase 16: Display session code for sharing with players
+  async function showSessionCode() {
+    try {
+      const session = await api.invoke('session:get');
+      if (session?.session_code) {
+        const codeEl = document.getElementById('session-code-display');
+        codeEl.innerHTML = `Code: <strong style="color:#e8b84a;">${session.session_code}</strong>`;
+        codeEl.style.borderColor = '#c8922a';
+        codeEl.addEventListener('click', () => {
+          navigator.clipboard.writeText(session.session_code);
+          codeEl.style.background = 'rgba(200,146,42,0.1)';
+          setTimeout(() => { codeEl.style.background = ''; }, 300);
+        });
+      }
+    } catch (e) { console.warn('[overlay-dm] session:get failed:', e); }
+  }
+
   setTimeout(async () => {
+    showSessionCode();
+
     try {
       const rolls = await api.invoke('rolls:get');
       if (Array.isArray(rolls)) [...rolls].reverse().forEach(prependRoll);
