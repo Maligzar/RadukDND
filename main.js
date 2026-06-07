@@ -245,6 +245,12 @@ function registerIpcHandlers() {
     return { ok: true, session: activeSession };
   });
 
+  // ── Phase 16: Get current session info for onboarding ──────
+  ipcMain.handle('session:get', () => {
+    if (!activeSession) return null;
+    return campaignDb.prepare('SELECT * FROM sessions WHERE id=?').get(activeSession.id);
+  });
+
   // ── Roll capture ───────────────────────────────────────────
   ipcMain.on('roll:captured', (_, payload) => {
     if (!activeSession) return;
@@ -502,6 +508,39 @@ function registerIpcHandlers() {
 
     recapWin.loadFile(path.join(__dirname, 'renderer', 'recap.html'));
     recapWin.setMenuBarVisibility(false);
+  });
+
+  // ── Phase 17: Switch D&D Beyond character ──────────────────
+  ipcMain.handle('ddb:switch-character', async (_, { characterUrl }) => {
+    if (!activeSession || appRole !== 'dm' || !ddbView) return { ok: false };
+
+    if (typeof characterUrl !== 'string' || !characterUrl.startsWith('https://www.dndbeyond.com/')) {
+      return { ok: false, error: 'URL must be a D&D Beyond character URL' };
+    }
+
+    try {
+      ddbView.webContents.loadURL(characterUrl);
+      campaignDb.prepare('UPDATE sessions SET ddb_character_url=? WHERE id=?')
+        .run(characterUrl, activeSession.id);
+      console.log('[main] Switched to character URL:', characterUrl);
+      return { ok: true };
+    } catch (err) {
+      console.error('[main] Failed to switch character:', err);
+      return { ok: false, error: err.message };
+    }
+  });
+
+  // ── Phase 17: Receive character info from DDB preload ──────
+  ipcMain.on('ddb:character-info', (_, info) => {
+    if (!activeSession || appRole !== 'dm') return;
+    if (info.name || info.url) {
+      if (info.url && !activeSession.ddb_character_url) {
+        campaignDb.prepare('UPDATE sessions SET ddb_character_url=? WHERE id=?')
+          .run(info.url, activeSession.id);
+        activeSession.ddb_character_url = info.url;
+      }
+      overlayView?.webContents.send('ddb:character-info', info);
+    }
   });
 }
 

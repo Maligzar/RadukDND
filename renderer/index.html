@@ -451,15 +451,16 @@
     window.electronAPI.send('window:exit');
   }
 
-  // ── Role picker ─────────────────────────────────────────────
+  // ── Phase 16: Player Onboarding ─────────────────────────────
+  // Show session code field for players to join existing sessions
   function selectRole(role) {
     selectedRole = role;
     document.getElementById('btn-player').classList.toggle('selected', role === 'player');
     document.getElementById('btn-dm').classList.toggle('selected', role === 'dm');
 
-    // Session code field shown for Player role in Phase 11 (relay live)
-    // document.getElementById('session-code-group').style.display =
-    //   role === 'player' ? 'block' : 'none';
+    // Session code field shown for Player role (Phase 16: onboarding)
+    document.getElementById('session-code-group').style.display =
+      role === 'player' ? 'block' : 'none';
 
     validate();
   }
@@ -467,6 +468,7 @@
   function validate() {
     const charName   = document.getElementById('char-name').value.trim();
     const playerName = document.getElementById('player-name').value.trim();
+    const sessionCode = document.getElementById('session-code').value.trim();
     const btn        = document.getElementById('enter-btn');
     const err        = document.getElementById('error-msg');
 
@@ -475,6 +477,9 @@
     if (!selectedRole) { btn.disabled = true; return; }
     if (!charName)     { btn.disabled = true; return; }
     if (!playerName)   { btn.disabled = true; return; }
+
+    // Phase 16: Players must provide session code to join
+    if (selectedRole === 'player' && !sessionCode) { btn.disabled = true; return; }
 
     btn.disabled = false;
   }

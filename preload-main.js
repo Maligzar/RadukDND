@@ -23,11 +23,14 @@ const ALLOWED_SEND = new Set([
   'window:exit',
   'window:fullscreen',
   'window:minimize',
+  // Phase 17: character switching
+  'ddb:character-info',
 ]);
 
 // Channels the renderer is allowed to INVOKE (request/response)
 const ALLOWED_INVOKE = new Set([
   'session:set-role',
+  'session:get',
   'rolls:get',
   'initiative:get',
   'initiative:add-combatant',
@@ -42,6 +45,8 @@ const ALLOWED_INVOKE = new Set([
   'recap:get-stats',
   'recap:get-initiative',
   'recap:get-session',
+  // Phase 17: character switching
+  'ddb:switch-character',
 ]);
 
 // Channels the renderer is allowed to RECEIVE from main
@@ -52,6 +57,8 @@ const ALLOWED_RECEIVE = new Set([
   'view:active',
   'session:info',
   'stats:update',
+  // Phase 17: character switching
+  'ddb:character-info',
 ]);
 
 contextBridge.exposeInMainWorld('electronAPI', {
