@@ -335,6 +335,7 @@
   <div class="pip" id="relay-pip" title="Relay connection"></div>
   <span class="status-text" id="status-text">DM Session</span>
   <span id="session-code-display" style="font-family:'Cinzel',serif;font-size:9px;color:#c8922a;letter-spacing:0.06em;margin-left:auto;margin-right:8px;cursor:pointer;padding:2px 6px;border:1px solid #3a2e1e;border-radius:2px;transition:all 0.12s;" title="Click to copy">Code: <strong style="color:#e8b84a;">—</strong></span>
+  <button class="session-end-btn" id="btn-encounter" style="margin-right:4px;">⚔ Encounter</button>
   <button class="session-end-btn" id="btn-recap" style="margin-right:4px;">⎙ Recap</button>
   <button class="session-end-btn" id="btn-end-session">End Session</button>
 </div>
@@ -635,6 +636,10 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-add-submit').addEventListener('click', addCombatant);
   document.getElementById('add-form').addEventListener('keydown', e => {
     if (e.key === 'Enter') addCombatant();
+  });
+
+  document.getElementById('btn-encounter').addEventListener('click', () => {
+    api.send('encounter:open');
   });
 
   document.getElementById('btn-recap').addEventListener('click', () => {

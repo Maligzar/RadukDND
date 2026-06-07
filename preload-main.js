@@ -25,6 +25,8 @@ const ALLOWED_SEND = new Set([
   'window:minimize',
   // Phase 17: character switching
   'ddb:character-info',
+  // Phase 18: encounter generator
+  'encounter:open',
 ]);
 
 // Channels the renderer is allowed to INVOKE (request/response)
@@ -38,6 +40,7 @@ const ALLOWED_INVOKE = new Set([
   'initiative:remove',
   'bestiary:query',
   'bestiary:get-monster',
+  'bestiary:get-types',
   'encounter:save',
   'stats:get',
   // Phase 15: recap
