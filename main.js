@@ -542,6 +542,31 @@ function registerIpcHandlers() {
       overlayView?.webContents.send('ddb:character-info', info);
     }
   });
+
+  // ── Phase 18: Encounter Generator ─────────────────────────
+  ipcMain.handle('bestiary:get-types', () => {
+    if (!bestiaryDb || appRole !== 'dm') return [];
+    return bestiaryDb.prepare(`SELECT DISTINCT type FROM monsters ORDER BY type`).all().map(r => r.type);
+  });
+
+  ipcMain.on('encounter:open', () => {
+    if (!activeSession || appRole !== 'dm') return;
+
+    const encWin = new BrowserWindow({
+      width: 700, height: 620,
+      title: 'Encounter Generator',
+      backgroundColor: '#0d0b08',
+      parent: mainWindow,
+      webPreferences: {
+        preload: path.join(__dirname, 'preload-main.js'),
+        contextIsolation: true,
+        nodeIntegration: false,
+      },
+    });
+
+    encWin.loadFile(path.join(__dirname, 'renderer', 'encounter-generator.html'));
+    encWin.setMenuBarVisibility(false);
+  });
 }
 
 function generateSessionCode() {

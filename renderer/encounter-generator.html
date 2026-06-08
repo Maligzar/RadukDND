@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'">
+<title>Encounter Generator</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #0d0b08;
+    color: #c9b08a;
+    font-family: 'IM Fell English', Georgia, serif;
+    font-size: 13px;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .win-hdr {
+    background: linear-gradient(to right, #8c1a1a, #4a0c0c);
+    border-bottom: 2px solid #c8922a;
+    padding: 8px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .win-title {
+    font-family: 'Cinzel', serif;
+    font-size: 13px; font-weight: 700;
+    color: #e8b84a; letter-spacing: 0.16em; text-transform: uppercase; flex: 1;
+  }
+  .gem { width: 8px; height: 8px; border-radius: 50%; background: #cc2a2a; border: 1px solid #c8922a; flex-shrink: 0; }
+
+  .body-wrap {
+    flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 10px;
+    gap: 8px;
+  }
+
+  /* Filters */
+  .filter-panel {
+    background: #161210; border: 1px solid #4a3c28;
+    padding: 8px 10px; flex-shrink: 0;
+  }
+  .filter-title {
+    font-family: 'Cinzel', serif; font-size: 9px; color: #705a3a;
+    letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 8px;
+  }
+  .filter-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+  }
+  .filter-group { display: flex; flex-direction: column; gap: 3px; }
+  .filter-label {
+    font-family: 'Cinzel', serif; font-size: 9px; color: #705a3a;
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .filter-input, .filter-select {
+    background: #0d0b08; color: #c9b08a; border: 1px solid #4a3c28;
+    padding: 4px 6px; font-size: 11px;
+    font-family: 'IM Fell English', Georgia, serif;
+  }
+  .filter-select option { background: #0d0b08; }
+  .filter-row-inline {
+    display: flex; gap: 4px; align-items: center;
+  }
+  .filter-sep { color: #705a3a; font-size: 11px; padding: 0 2px; }
+  .filter-actions { display: flex; gap: 6px; margin-top: 8px; }
+  .btn {
+    font-family: 'Cinzel', serif; font-size: 10px; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    border: 1px solid; padding: 5px 12px; cursor: pointer;
+    transition: all 0.12s; background: transparent;
+  }
+  .btn-primary { color: #c8922a; border-color: #c8922a; }
+  .btn-primary:hover { background: rgba(200,146,42,0.12); }
+  .btn-secondary { color: #705a3a; border-color: #4a3c28; }
+  .btn-secondary:hover { color: #c9b08a; border-color: #705a3a; }
+  .btn-danger { color: #8c1a1a; border-color: #4a1a1a; }
+  .btn-danger:hover { color: #cc2a2a; border-color: #8c1a1a; }
+  .btn-green { color: #2a9a2a; border-color: #1a5a1a; }
+  .btn-green:hover { background: rgba(42,154,42,0.1); }
+  .btn:disabled { opacity: 0.35; cursor: default; }
+
+  /* Difficulty bar */
+  .diff-panel {
+    background: #161210; border: 1px solid #4a3c28;
+    padding: 8px 10px; flex-shrink: 0;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .diff-title {
+    font-family: 'Cinzel', serif; font-size: 9px; color: #705a3a;
+    letter-spacing: 0.1em; text-transform: uppercase; flex-shrink: 0;
+  }
+  .diff-track {
+    flex: 1; height: 8px; background: #0d0b08; border: 1px solid #3a2e1e;
+    position: relative; overflow: hidden;
+  }
+  .diff-fill { height: 100%; transition: width 0.35s ease; }
+  .diff-fill.easy   { background: #2a7a2a; }
+  .diff-fill.medium { background: #b07820; }
+  .diff-fill.hard   { background: #cc5a1a; }
+  .diff-fill.deadly { background: #8c1a1a; }
+  .diff-badge {
+    font-family: 'Cinzel', serif; font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; flex-shrink: 0;
+    padding: 2px 8px; border: 1px solid;
+  }
+  .diff-badge.easy   { color: #2a9a2a; border-color: #1a5a1a; }
+  .diff-badge.medium { color: #c8922a; border-color: #705a3a; }
+  .diff-badge.hard   { color: #cc5a1a; border-color: #7a3a1a; }
+  .diff-badge.deadly { color: #cc2a2a; border-color: #8c1a1a; }
+  .diff-badge.none   { color: #705a3a; border-color: #3a2e1e; }
+  .diff-xp {
+    font-family: 'Cinzel', serif; font-size: 9px; color: #705a3a;
+    flex-shrink: 0; letter-spacing: 0.06em;
+  }
+
+  /* Monster list */
+  .monster-scroll {
+    flex: 1; overflow-y: auto; background: #161210;
+    border: 1px solid #4a3c28; min-height: 0;
+  }
+  .monster-scroll::-webkit-scrollbar { width: 4px; }
+  .monster-scroll::-webkit-scrollbar-track { background: transparent; }
+  .monster-scroll::-webkit-scrollbar-thumb { background: #4a3c28; border-radius: 2px; }
+
+  .monster-empty {
+    padding: 30px; text-align: center;
+    font-family: 'Cinzel', serif; font-size: 10px;
+    color: #4a3820; letter-spacing: 0.1em; text-transform: uppercase;
+  }
+
+  .monster-row {
+    display: grid; grid-template-columns: 1fr 42px 50px 48px 52px 76px;
+    align-items: center; gap: 6px; padding: 7px 10px;
+    border-bottom: 1px solid rgba(74,60,40,0.25);
+    transition: background 0.1s;
+  }
+  .monster-row:hover { background: rgba(200,146,42,0.03); }
+  .m-name { font-size: 12px; color: #e8dcc8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .m-sub  { font-size: 9px; color: #705a3a; margin-top: 1px; }
+  .m-stat {
+    font-family: 'Cinzel', serif; font-size: 11px; color: #c9b08a;
+    text-align: center;
+  }
+  .m-stat-label { font-size: 7px; color: #4a3820; text-transform: uppercase; letter-spacing: 0.06em; text-align: center; }
+  .m-stat-wrap { text-align: center; }
+  .m-cr { color: #c8922a; }
+  .m-count-wrap {
+    display: flex; align-items: center; gap: 3px; justify-content: flex-end;
+  }
+  .count-btn {
+    width: 18px; height: 18px; background: #1e1810; border: 1px solid #4a3c28;
+    color: #c9b08a; font-size: 13px; line-height: 1; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.1s; flex-shrink: 0;
+  }
+  .count-btn:hover { border-color: #c8922a; color: #c8922a; }
+  .count-num {
+    font-family: 'Cinzel', serif; font-size: 13px; color: #e8b84a;
+    min-width: 18px; text-align: center;
+  }
+
+  /* Col header */
+  .monster-header {
+    display: grid; grid-template-columns: 1fr 42px 50px 48px 52px 76px;
+    gap: 6px; padding: 4px 10px 4px;
+    border-bottom: 1px solid #4a3c28; background: #0d0b08;
+    position: sticky; top: 0; z-index: 1;
+  }
+  .col-hdr {
+    font-family: 'Cinzel', serif; font-size: 8px; color: #4a3820;
+    letter-spacing: 0.1em; text-transform: uppercase; text-align: center;
+  }
+  .col-hdr:first-child { text-align: left; }
+
+  /* Bottom action bar */
+  .action-bar {
+    display: flex; gap: 6px; flex-shrink: 0; padding-top: 4px;
+  }
+  .action-bar .btn { flex: 1; text-align: center; padding: 7px; }
+</style>
+</head>
+<body>
+
+<div class="win-hdr">
+  <div class="gem"></div>
+  <span class="win-title">Encounter Generator</span>
+  <span id="party-info" style="font-family:'Cinzel',serif;font-size:9px;color:#705a3a;letter-spacing:0.06em;"></span>
+</div>
+
+<div class="body-wrap">
+
+  <div class="filter-panel">
+    <div class="filter-title">Filters</div>
+    <div class="filter-grid">
+      <div class="filter-group">
+        <span class="filter-label">CR Range</span>
+        <div class="filter-row-inline">
+          <input class="filter-input" id="cr-min" type="number" value="0" min="0" max="30" style="width:52px;">
+          <span class="filter-sep">—</span>
+          <input class="filter-input" id="cr-max" type="number" value="5" min="0" max="30" style="width:52px;">
+        </div>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">Count</span>
+        <input class="filter-input" id="count" type="number" value="6" min="1" max="20" style="width:80px;">
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">Environment</span>
+        <select class="filter-select" id="environment">
+          <option value="">Any</option>
+          <option value="arctic">Arctic</option>
+          <option value="coastal">Coastal</option>
+          <option value="desert">Desert</option>
+          <option value="dungeon">Dungeon</option>
+          <option value="forest">Forest</option>
+          <option value="grassland">Grassland</option>
+          <option value="hill">Hill</option>
+          <option value="mountain">Mountain</option>
+          <option value="swamp">Swamp</option>
+          <option value="underdark">Underdark</option>
+          <option value="underwater">Underwater</option>
+          <option value="urban">Urban</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">Type</span>
+        <select class="filter-select" id="monster-type">
+          <option value="">Any</option>
+        </select>
+      </div>
+    </div>
+    <div class="filter-actions">
+      <button class="btn btn-primary" id="btn-generate">⚄ Generate</button>
+      <button class="btn btn-secondary" id="btn-clear-list">✕ Clear</button>
+    </div>
+  </div>
+
+  <div class="diff-panel" id="diff-panel">
+    <span class="diff-title">Difficulty</span>
+    <div class="diff-track"><div class="diff-fill none" id="diff-fill" style="width:0%"></div></div>
+    <span class="diff-badge none" id="diff-badge">—</span>
+    <span class="diff-xp" id="diff-xp">0 XP</span>
+  </div>
+
+  <div class="monster-scroll" id="monster-scroll">
+    <div class="monster-header">
+      <span class="col-hdr">Monster</span>
+      <span class="col-hdr">CR</span>
+      <span class="col-hdr">HP</span>
+      <span class="col-hdr">AC</span>
+      <span class="col-hdr">XP</span>
+      <span class="col-hdr">Count</span>
+    </div>
+    <div class="monster-empty" id="monster-empty">Generate an encounter to begin</div>
+  </div>
+
+  <div class="action-bar">
+    <button class="btn btn-green"     id="btn-add-all"  disabled>+ Add to Initiative</button>
+    <button class="btn btn-secondary" id="btn-save"     disabled>⎙ Save</button>
+  </div>
+
+</div>
+
+<script>
+'use strict';
+
+window.addEventListener('DOMContentLoaded', async () => {
+
+  const api = window.electronAPI;
+  if (!api) {
+    document.body.innerHTML = '<div style="padding:20px;color:#cc2a2a;font-family:monospace;">ERROR: preload not available</div>';
+    return;
+  }
+
+  // ── XP thresholds per character per level (5e) ───────────────
+  const XP_THRESHOLDS = [
+    null,
+    [25,   50,   75,   100],
+    [50,   100,  150,  200],
+    [75,   150,  225,  400],
+    [125,  250,  375,  500],
+    [250,  500,  750,  1100],
+    [300,  600,  900,  1400],
+    [350,  750,  1100, 1700],
+    [450,  900,  1400, 2100],
+    [550,  1100, 1600, 2400],
+    [600,  1200, 1900, 2800],
+    [800,  1600, 2400, 3600],
+    [1000, 2000, 3000, 4500],
+    [1100, 2200, 3400, 5100],
+    [1250, 2500, 3800, 5700],
+    [1400, 2800, 4300, 6400],
+    [1600, 3200, 4800, 7200],
+    [2000, 3900, 5900, 8800],
+    [2100, 4200, 6300, 9500],
+    [2400, 4900, 7300, 10900],
+    [2800, 5700, 8500, 12700],
+  ];
+
+  // Monster count XP multipliers
+  function xpMultiplier(n) {
+    if (n === 1)        return 1;
+    if (n === 2)        return 1.5;
+    if (n <= 6)         return 2;
+    if (n <= 10)        return 2.5;
+    if (n <= 14)        return 3;
+    return 4;
+  }
+
+  // ── State ────────────────────────────────────────────────────
+  let partyLevel = 1;
+  let partySize  = 4;
+  let roster     = []; // [{ monster, count }]
+
+  // ── Bootstrap ────────────────────────────────────────────────
+  try {
+    const session = await api.invoke('session:get');
+    if (session) {
+      partyLevel = session.party_level || 1;
+      partySize  = session.party_size  || 4;
+      document.getElementById('party-info').textContent =
+        `Party: ${partySize}× Lv${partyLevel}`;
+
+      // Default CR to roughly match party level
+      const maxCr = Math.max(1, Math.round(partyLevel * 0.75));
+      document.getElementById('cr-max').value = Math.min(maxCr, 10);
+    }
+  } catch (e) { console.warn('[encounter-gen] session:get failed:', e); }
+
+  try {
+    const types = await api.invoke('bestiary:get-types');
+    const sel = document.getElementById('monster-type');
+    types.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t; opt.textContent = t.charAt(0).toUpperCase() + t.slice(1);
+      sel.appendChild(opt);
+    });
+  } catch (e) { console.warn('[encounter-gen] bestiary:get-types failed:', e); }
+
+  // ── Helpers ──────────────────────────────────────────────────
+  function esc(s) {
+    return s ? String(s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;') : '';
+  }
+
+  function formatCr(cr) {
+    if (cr === 0.125) return '1/8';
+    if (cr === 0.25)  return '1/4';
+    if (cr === 0.5)   return '1/2';
+    return String(cr);
+  }
+
+  function calcDifficulty() {
+    const level = Math.max(1, Math.min(20, partyLevel));
+    const thresholds = XP_THRESHOLDS[level];
+    const budgets = thresholds.map(t => t * partySize);
+
+    const totalMonsters = roster.reduce((s, e) => s + e.count, 0);
+    const rawXp = roster.reduce((s, e) => s + (e.monster.xp || 0) * e.count, 0);
+    const adjustedXp = Math.round(rawXp * xpMultiplier(totalMonsters));
+
+    let difficulty = 'none';
+    let pct = 0;
+    if (adjustedXp > 0) {
+      if      (adjustedXp < budgets[0]) { difficulty = 'trivial'; pct = (adjustedXp / budgets[0]) * 20; }
+      else if (adjustedXp < budgets[1]) { difficulty = 'easy';    pct = 20 + ((adjustedXp - budgets[0]) / (budgets[1] - budgets[0])) * 20; }
+      else if (adjustedXp < budgets[2]) { difficulty = 'medium';  pct = 40 + ((adjustedXp - budgets[1]) / (budgets[2] - budgets[1])) * 20; }
+      else if (adjustedXp < budgets[3]) { difficulty = 'hard';    pct = 60 + ((adjustedXp - budgets[2]) / (budgets[3] - budgets[2])) * 20; }
+      else                              { difficulty = 'deadly';  pct = Math.min(100, 80 + ((adjustedXp - budgets[3]) / budgets[3]) * 20); }
+    }
+
+    return { difficulty, rawXp, adjustedXp, pct, budgets };
+  }
+
+  function updateDifficultyBar() {
+    if (!roster.length) {
+      document.getElementById('diff-fill').style.width = '0%';
+      document.getElementById('diff-fill').className = 'diff-fill none';
+      document.getElementById('diff-badge').textContent = '—';
+      document.getElementById('diff-badge').className = 'diff-badge none';
+      document.getElementById('diff-xp').textContent = '0 XP';
+      return;
+    }
+
+    const { difficulty, adjustedXp, rawXp, pct } = calcDifficulty();
+    const displayDiff = difficulty === 'trivial' ? 'easy' : difficulty;
+    const label = difficulty === 'trivial' ? 'Trivial' : difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
+
+    document.getElementById('diff-fill').style.width = `${pct}%`;
+    document.getElementById('diff-fill').className = `diff-fill ${displayDiff}`;
+    document.getElementById('diff-badge').textContent = label;
+    document.getElementById('diff-badge').className = `diff-badge ${displayDiff === 'none' ? 'none' : displayDiff}`;
+    document.getElementById('diff-xp').textContent =
+      rawXp === adjustedXp ? `${adjustedXp.toLocaleString()} XP` : `${adjustedXp.toLocaleString()} XP (adj.)`;
+  }
+
+  function updateActions() {
+    const hasMonsters = roster.length > 0;
+    document.getElementById('btn-add-all').disabled = !hasMonsters;
+    document.getElementById('btn-save').disabled    = !hasMonsters;
+  }
+
+  // ── Render monster list ──────────────────────────────────────
+  function renderRoster() {
+    const scroll  = document.getElementById('monster-scroll');
+    const header  = scroll.querySelector('.monster-header');
+    const emptyEl = document.getElementById('monster-empty');
+
+    // Remove existing rows (keep header)
+    [...scroll.children].forEach(el => {
+      if (!el.classList.contains('monster-header') && !el.id.endsWith('empty')) el.remove();
+    });
+
+    if (!roster.length) {
+      if (!document.getElementById('monster-empty')) {
+        const emp = document.createElement('div');
+        emp.className = 'monster-empty'; emp.id = 'monster-empty';
+        emp.textContent = 'Generate an encounter to begin';
+        scroll.appendChild(emp);
+      }
+      updateDifficultyBar();
+      updateActions();
+      return;
+    }
+
+    if (emptyEl) emptyEl.remove();
+
+    roster.forEach((entry, idx) => {
+      const { monster, count } = entry;
+      const row = document.createElement('div');
+      row.className = 'monster-row';
+      row.innerHTML = `
+        <div>
+          <div class="m-name">${esc(monster.name)}</div>
+          <div class="m-sub">${esc(monster.type)}${monster.subtype ? ` (${esc(monster.subtype)})` : ''} · ${esc(monster.size)}</div>
+        </div>
+        <div class="m-stat-wrap">
+          <div class="m-stat m-cr">${formatCr(monster.cr)}</div>
+          <div class="m-stat-label">CR</div>
+        </div>
+        <div class="m-stat-wrap">
+          <div class="m-stat">${monster.hp_avg ?? '—'}</div>
+          <div class="m-stat-label">HP</div>
+        </div>
+        <div class="m-stat-wrap">
+          <div class="m-stat">${monster.ac ?? '—'}</div>
+          <div class="m-stat-label">AC</div>
+        </div>
+        <div class="m-stat-wrap">
+          <div class="m-stat">${monster.xp != null ? monster.xp.toLocaleString() : '—'}</div>
+          <div class="m-stat-label">XP</div>
+        </div>
+        <div class="m-count-wrap">
+          <button class="count-btn" data-idx="${idx}" data-delta="-1">−</button>
+          <span class="count-num">${count}</span>
+          <button class="count-btn" data-idx="${idx}" data-delta="1">+</button>
+        </div>`;
+
+      row.querySelectorAll('.count-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const i     = parseInt(btn.dataset.idx, 10);
+          const delta = parseInt(btn.dataset.delta, 10);
+          roster[i].count = Math.max(1, (roster[i].count || 1) + delta);
+          renderRoster();
+        });
+      });
+
+      scroll.appendChild(row);
+    });
+
+    updateDifficultyBar();
+    updateActions();
+  }
+
+  // ── Generate ─────────────────────────────────────────────────
+  document.getElementById('btn-generate').addEventListener('click', async () => {
+    const crMin  = parseFloat(document.getElementById('cr-min').value)  || 0;
+    const crMax  = parseFloat(document.getElementById('cr-max').value)  || 1;
+    const count  = parseInt(document.getElementById('count').value, 10) || 6;
+    const env    = document.getElementById('environment').value;
+    const type   = document.getElementById('monster-type').value;
+
+    const btn = document.getElementById('btn-generate');
+    btn.disabled = true;
+    btn.textContent = '... Generating';
+
+    try {
+      const monsters = await api.invoke('bestiary:query', {
+        crMin, crMax, environment: env || null, type: type || null, limit: count,
+      });
+
+      if (!monsters || !monsters.length) {
+        btn.disabled = false; btn.textContent = '⚄ Generate';
+        const emp = document.getElementById('monster-empty') || (() => {
+          const e = document.createElement('div'); e.id = 'monster-empty';
+          e.className = 'monster-empty'; return e;
+        })();
+        emp.textContent = 'No monsters found — adjust filters';
+        document.getElementById('monster-scroll').appendChild(emp);
+        return;
+      }
+
+      roster = monsters.map(m => ({ monster: m, count: 1 }));
+      renderRoster();
+    } catch (e) {
+      console.error('[encounter-gen] bestiary:query failed:', e);
+    }
+
+    btn.disabled = false; btn.textContent = '⚄ Generate';
+  });
+
+  // ── Clear ─────────────────────────────────────────────────────
+  document.getElementById('btn-clear-list').addEventListener('click', () => {
+    roster = [];
+    renderRoster();
+  });
+
+  // ── Add all to initiative ─────────────────────────────────────
+  document.getElementById('btn-add-all').addEventListener('click', async () => {
+    if (!roster.length) return;
+
+    const btn = document.getElementById('btn-add-all');
+    btn.disabled = true;
+
+    for (const { monster, count } of roster) {
+      for (let i = 0; i < count; i++) {
+        const name = count > 1 ? `${monster.name} ${i + 1}` : monster.name;
+        try {
+          await api.invoke('initiative:add-combatant', {
+            combatant_name:   name,
+            combatant_type:   'enemy',
+            initiative_score: Math.floor(Math.random() * 20) + 1,
+            hp_current:       monster.hp_avg ?? 0,
+            hp_max:           monster.hp_avg ?? 0,
+            ac:               monster.ac     ?? 10,
+            monster_id:       monster.id,
+          });
+        } catch (e) { console.error('[encounter-gen] add-combatant failed:', e); }
+      }
+    }
+
+    btn.disabled = false;
+    btn.textContent = '✓ Added!';
+    setTimeout(() => { btn.textContent = '+ Add to Initiative'; }, 1500);
+  });
+
+  // ── Save encounter ────────────────────────────────────────────
+  document.getElementById('btn-save').addEventListener('click', async () => {
+    if (!roster.length) return;
+
+    const { difficulty, rawXp } = calcDifficulty();
+    const displayDiff = (difficulty === 'trivial' || difficulty === 'none') ? 'easy' : difficulty;
+
+    try {
+      const monsters = roster.flatMap(({ monster, count }) =>
+        Array.from({ length: count }, () => ({ id: monster.id, name: monster.name, cr: monster.cr, xp: monster.xp }))
+      );
+      await api.invoke('encounter:save', {
+        monsters,
+        difficulty: displayDiff,
+        xp_total: rawXp,
+      });
+      const btn = document.getElementById('btn-save');
+      btn.textContent = '✓ Saved!';
+      setTimeout(() => { btn.textContent = '⎙ Save'; }, 1500);
+    } catch (e) { console.error('[encounter-gen] encounter:save failed:', e); }
+  });
+
+});
+</script>
+</body>
+</html>
