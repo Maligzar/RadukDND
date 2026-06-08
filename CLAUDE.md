@@ -3,7 +3,7 @@
 
 **Project Goal:** Electron desktop app for D&D session management with multi-player support, roll bridging, and initiative tracking. **Discord integration removed** — focus is on portability and core combat UX.
 
-**Current Phase:** 17 (Character URL Switcher - Complete)
+**Current Phase:** 19 (Multi-player Relay Integration - In Progress)
 
 ---
 
@@ -33,12 +33,14 @@ External Relay (Google Cloud) — Optional for multi-player
 
 ### Key Files
 - **main.js** — Electron main, IPC handlers, view layout, DB queries
+- **relay-client.js** — Phase 19: Socket.io client for multi-player sync
 - **preload-main.js** — Exposes ipcRenderer to overlay
 - **preload-ddb.js** — Intercepts D&D Beyond rolls (DOM events, MutationObserver, fetch hooks)
 - **preload-r20.js** — Captures Roll20 HP updates
 - **renderer/index.html** — Role picker UI
 - **renderer/overlay-dm.html** / **overlay-player.html** — Combat UIs
 - **renderer/card-browser.html** / **card-browser.js** — Spell/item browser
+- **renderer/encounter-generator.html** — Phase 18: Random encounter builder
 - **db/db-init.js** — SQLite schema + prepared statements
 
 ### Database Schema
@@ -305,6 +307,86 @@ socket.on('player:left', (playerCount) => {...});
 
 ---
 
+## Phase 19: Multi-player Relay Integration
+
+### Objectives
+1. **Connect to relay server** — DM/players join session room by code
+2. **Broadcast events** — Rolls, HP updates, initiative changes propagate to all clients
+3. **Multi-player sync** — All clients see consistent state in real-time
+4. **Graceful fallback** — App works offline; relay is optional enhancement
+
+### Implementation
+
+#### Step 1: Socket.io Client Module
+**New file:** `relay-client.js`
+- Singleton Socket.io client to `34.31.125.161`
+- Auto-connect on app startup (non-blocking)
+- Methods: `joinSession(code, role)`, `broadcastRoll(roll)`, `broadcastHpUpdate(...)`, `broadcastInitiativeSync(...)`
+- Event listeners for incoming broadcast events
+- Reconnection with exponential backoff (1s → 5s, max 5 attempts)
+
+#### Step 2: Main Process Integration
+**Modify:** `main.js`
+- Import and initialize relay-client on app ready
+- Call `relayClient.joinSession()` when role is set
+- Hook all roll/HP/initiative events to `relayClient.broadcast*()`
+- Set up relay event listeners that forward to overlayView
+- Disconnect on app quit
+
+#### Step 3: Event Flow
+| Event | Source → Relay → Target |
+|-------|------------------------|
+| Rolls | DM/Player DDB → relay.roll:broadcast → all overlay views |
+| HP Updates | DM initiative → relay.hp:update → all overlay views |
+| Initiative | DM action → relay.initiative:sync → all overlay views |
+| Player Join | Any client → relay.player:joined → all clients |
+
+#### Step 4: Package Dependencies
+- Add `socket.io-client@^4.7.2` to package.json (auto-installed on npm install)
+
+### Relay Server Event Schema
+
+**Client → Server**
+```javascript
+// Join session room
+socket.emit('session:join', { code, role, dmName });
+
+// Broadcast events
+socket.emit('roll:broadcast', { code, roll: {...} });
+socket.emit('hp:update', { code, combatant_name, hp_current, hp_max });
+socket.emit('initiative:sync', { code, combatants: [...] });
+
+// Leave session
+socket.emit('session:leave', { code, role });
+```
+
+**Server → Client**
+```javascript
+// Broadcast to room
+socket.on('roll:broadcast', (data) => { ... });
+socket.on('hp:update', (data) => { ... });
+socket.on('initiative:sync', (data) => { ... });
+socket.on('player:joined', (playerCount) => { ... });
+socket.on('player:left', (playerCount) => { ... });
+```
+
+### Test Plan
+- [ ] DM and Player instances connect to relay on app start
+- [ ] Both join same session by code
+- [ ] Roll in DDB (DM side) → appears on Player side overlay
+- [ ] Update HP in initiative (DM side) → reflects on Player side
+- [ ] Add/remove combatant (DM side) → syncs to Player side
+- [ ] Relay disconnects → app continues, events queue
+- [ ] Relay reconnects → pending events flush
+
+### Limitations & Future
+- **No auth** — relay server assumes trusted network (internal only)
+- **No persistence** — relay is stateless, clients are source of truth
+- **Optional** — if relay unavailable, app works locally (no cross-client sync)
+- **Scaling** — current design supports ~10-20 concurrent rooms
+
+---
+
 ## Phase 12+ Roadmap
 
 | Feature | Phase | Status | Effort |
@@ -312,9 +394,9 @@ socket.on('player:left', (playerCount) => {...});
 | Character URL Switcher | 17 | ✓ Complete | 3 days |
 | Session Recap PDF Export | 15 | ✓ Complete | 1 week |
 | Player Onboarding | 16 | ✓ Complete | 1 week |
-| Encounter Generator UI | 18 | Planned | 1 week |
-| Multi-player Relay Integration | 19 | Planned | 2 weeks |
-| Audio/Video Streaming | 20+ | Future | TBD |
+| Encounter Generator UI | 18 | ✓ Complete | 1 week |
+| Multi-player Relay Integration | 19 | ⧗ In Progress | 2 weeks |
+| Audio/Video Streaming | 20+ | Planned | TBD |
 
 ---
 
@@ -348,6 +430,6 @@ Run two instances of the app:
 ---
 
 ## Current Status
-- **Phase:** 17 (Character URL Switcher)
-- **Branch:** `claude/phase17-character-switcher` (in progress)
-- **Next:** Merge Phase 17, then Phase 18 (Encounter Generator UI)
+- **Phase:** 19 (Multi-player Relay Integration)
+- **Branch:** `claude/phase19-relay-integration` (in progress)
+- **Next:** Merge Phase 19, then Phase 20 (Audio/Video Streaming or other features)
