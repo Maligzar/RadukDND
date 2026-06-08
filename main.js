@@ -3,6 +3,7 @@
 const { app, BrowserWindow, BrowserView, ipcMain, shell } = require('electron');
 const path = require('path');
 const { openCampaignDb, openBestiaryDb, getStatements } = require('./db/db-init');
+const relayClient = require('./relay-client');
 
 // ─────────────────────────────────────────────────────────────
 // State
@@ -32,16 +33,27 @@ const CARD_BROWSER_W = 80; // Phase 13: collapsible card browser (left sidebar)
 // ─────────────────────────────────────────────────────────────
 // App ready
 // ─────────────────────────────────────────────────────────────
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   campaignDb = openCampaignDb(app);
   bestiaryDb = openBestiaryDb();
   db         = getStatements(campaignDb);
   registerIpcHandlers();
   createMainWindow();
+
+  // Phase 19: Connect to relay server
+  try {
+    await relayClient.connect();
+    console.log('[main] Relay server connected');
+  } catch (err) {
+    console.warn('[main] Relay connection failed:', err.message);
+  }
 });
 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
-app.on('before-quit', () => { if (campaignDb) campaignDb.close(); });
+app.on('before-quit', () => {
+  relayClient.disconnect();
+  if (campaignDb) campaignDb.close();
+});
 
 // ─────────────────────────────────────────────────────────────
 // Main window
@@ -242,6 +254,10 @@ function registerIpcHandlers() {
     }
 
     createViews(role);
+
+    // Phase 19: Join relay session
+    relayClient.joinSession(activeSession.code, role, (role === 'dm' ? (playerName || 'DM') : playerName));
+
     return { ok: true, session: activeSession };
   });
 
@@ -272,15 +288,20 @@ function registerIpcHandlers() {
         player_name:    activeSession.playerName    ?? null,
       });
     }
-    // TODO Phase 11: relaySocket?.emit('roll:broadcast', roll);
+    // Phase 19: Broadcast to relay
+    relayClient.broadcastRoll(roll);
   });
 
   // ── HP update (DM only) ────────────────────────────────────
   ipcMain.on('hp:update', (_, { combatant_name, hp_current }) => {
     if (!activeSession || appRole !== 'dm') return;
+    const combatant = campaignDb.prepare(`SELECT hp_max FROM initiative WHERE session_id=? AND combatant_name=? LIMIT 1`)
+      .get(activeSession.id, combatant_name);
     campaignDb.prepare(`UPDATE initiative SET hp_current=? WHERE session_id=? AND combatant_name=?`)
       .run(hp_current, activeSession.id, combatant_name);
     overlayView?.webContents.send('hp:update', { combatant_name, hp_current });
+    // Phase 19: Broadcast to relay
+    if (combatant) relayClient.broadcastHpUpdate(combatant_name, hp_current, combatant.hp_max);
   });
 
   // ── Phase 14: HP update from Roll20 ────────────────────────
@@ -344,7 +365,10 @@ function registerIpcHandlers() {
   ipcMain.on('initiative:set-turn', (_, { id }) => {
     if (!activeSession || appRole !== 'dm') return;
     db.setActiveTurn.run({ id, session_id: activeSession.id });
-    overlayView?.webContents.send('initiative:sync', db.getInitiative.all(activeSession.id));
+    const combatants = db.getInitiative.all(activeSession.id);
+    overlayView?.webContents.send('initiative:sync', combatants);
+    // Phase 19: Broadcast to relay
+    relayClient.broadcastInitiativeSync(combatants);
   });
 
   ipcMain.handle('initiative:add-combatant', (_, combatant) => {
@@ -361,7 +385,10 @@ function registerIpcHandlers() {
       sort_order:       combatant.sort_order ?? count,
       monster_id:       combatant.monster_id ?? null,
     });
-    overlayView?.webContents.send('initiative:sync', db.getInitiative.all(activeSession.id));
+    const combatants = db.getInitiative.all(activeSession.id);
+    overlayView?.webContents.send('initiative:sync', combatants);
+    // Phase 19: Broadcast to relay
+    relayClient.broadcastInitiativeSync(combatants);
     return { ok: true, id: info.lastInsertRowid };
   });
 
@@ -375,14 +402,20 @@ function registerIpcHandlers() {
       campaignDb.prepare('UPDATE initiative SET hp_current=? WHERE id=? AND session_id=?')
         .run(hp_current, id, activeSession.id);
     }
-    overlayView?.webContents.send('initiative:sync', db.getInitiative.all(activeSession.id));
+    const combatants = db.getInitiative.all(activeSession.id);
+    overlayView?.webContents.send('initiative:sync', combatants);
+    // Phase 19: Broadcast to relay
+    relayClient.broadcastInitiativeSync(combatants);
     return { ok: true };
   });
 
   ipcMain.handle('initiative:remove', (_, { id }) => {
     if (!activeSession || appRole !== 'dm') return { ok: false };
     campaignDb.prepare('DELETE FROM initiative WHERE id=? AND session_id=?').run(id, activeSession.id);
-    overlayView?.webContents.send('initiative:sync', db.getInitiative.all(activeSession.id));
+    const combatants = db.getInitiative.all(activeSession.id);
+    overlayView?.webContents.send('initiative:sync', combatants);
+    // Phase 19: Broadcast to relay
+    relayClient.broadcastInitiativeSync(combatants);
     return { ok: true };
   });
 
@@ -392,13 +425,18 @@ function registerIpcHandlers() {
     const sorted = [...rows].sort((a, b) => b.initiative_score - a.initiative_score);
     const stmt   = campaignDb.prepare('UPDATE initiative SET sort_order=? WHERE id=?');
     campaignDb.transaction(() => sorted.forEach((r, i) => stmt.run(i, r.id)))();
-    overlayView?.webContents.send('initiative:sync', db.getInitiative.all(activeSession.id));
+    const combatants = db.getInitiative.all(activeSession.id);
+    overlayView?.webContents.send('initiative:sync', combatants);
+    // Phase 19: Broadcast to relay
+    relayClient.broadcastInitiativeSync(combatants);
   });
 
   ipcMain.on('initiative:clear', () => {
     if (!activeSession || appRole !== 'dm') return;
     db.clearInitiative.run(activeSession.id);
     overlayView?.webContents.send('initiative:sync', []);
+    // Phase 19: Broadcast to relay
+    relayClient.broadcastInitiativeSync([]);
   });
 
   // ── Roll history — Phase 10 fix: dmMode derived from appRole, not renderer ──
@@ -566,6 +604,31 @@ function registerIpcHandlers() {
 
     encWin.loadFile(path.join(__dirname, 'renderer', 'encounter-generator.html'));
     encWin.setMenuBarVisibility(false);
+  });
+
+  // ── Phase 19: Relay event listeners ────────────────────────
+  // Forward relay events to overlay (players see rolls/HP/initiative from DM)
+  relayClient.on('roll:broadcast', (data) => {
+    overlayView?.webContents.send('roll:display', data.roll);
+  });
+
+  relayClient.on('hp:update', (data) => {
+    overlayView?.webContents.send('hp:update', {
+      combatant_name: data.combatant_name,
+      hp_current: data.hp_current,
+    });
+  });
+
+  relayClient.on('initiative:sync', (data) => {
+    overlayView?.webContents.send('initiative:sync', data.combatants || []);
+  });
+
+  relayClient.on('player:joined', (data) => {
+    overlayView?.webContents.send('relay:player-joined', data);
+  });
+
+  relayClient.on('player:left', (data) => {
+    overlayView?.webContents.send('relay:player-left', data);
   });
 }
 
