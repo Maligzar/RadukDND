@@ -3,6 +3,7 @@
 const { app, BrowserWindow, BrowserView, ipcMain } = require('electron');
 const path = require('path');
 const { openCampaignDb, openBestiaryDb, getStatements } = require('./db/db-init');
+const relayClient = require('./relay-client');
 
 // ─────────────────────────────────────────────────────────────
 // State
@@ -41,6 +42,11 @@ app.whenReady().then(() => {
   db         = getStatements(campaignDb);
   registerIpcHandlers();
   createMainWindow();
+
+  // Phase 19: Connect to relay server (non-blocking)
+  relayClient.connect().catch(err => {
+    console.warn('[Relay] Initial connection failed (will retry):', err.message);
+  });
 });
 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
@@ -241,8 +247,13 @@ function registerIpcHandlers() {
         started_at: Date.now(), party_level: partyLevel || 1, party_size: partySize || 6,
       });
       activeSession = { id: info.lastInsertRowid, code, role: 'dm' };
+      relayClient.joinSession(code, 'dm', playerName || 'Dungeon Master');
     } else {
-      const code = generateSessionCode();
+      // Player joins DM's session using the provided code
+      if (!sessionCode) {
+        return { ok: false, error: 'Player must provide a session code' };
+      }
+      const code = sessionCode;
       const info = db.insertSession.run({
         session_code: code, dm_name: 'DM',
         started_at: Date.now(), party_level: partyLevel || 1, party_size: partySize || 6,
@@ -257,6 +268,7 @@ function registerIpcHandlers() {
         characterName: characterName || 'Hero',
         playerName:    playerName    || 'Player',
       };
+      relayClient.joinSession(code, 'player', playerName || 'Player');
     }
 
     createViews(role);
@@ -389,6 +401,41 @@ function registerIpcHandlers() {
     if (!activeSession || appRole !== 'dm') return;
     db.endSession.run({ id: activeSession.id, ended_at: Date.now() });
     activeSession = null;
+  });
+
+  // Phase 19: Set up relay event listeners
+  setupRelayListeners();
+}
+
+function setupRelayListeners() {
+  relayClient.on('roll:broadcast', (data) => {
+    if (overlayView && !overlayView.isDestroyed()) {
+      overlayView.webContents.send('roll:display', data);
+    }
+  });
+
+  relayClient.on('hp:update', (data) => {
+    if (overlayView && !overlayView.isDestroyed()) {
+      overlayView.webContents.send('hp:update', data);
+    }
+  });
+
+  relayClient.on('initiative:sync', (data) => {
+    if (overlayView && !overlayView.isDestroyed()) {
+      overlayView.webContents.send('initiative:sync', data);
+    }
+  });
+
+  relayClient.on('player:joined', (data) => {
+    if (overlayView && !overlayView.isDestroyed()) {
+      overlayView.webContents.send('relay:player-joined', data);
+    }
+  });
+
+  relayClient.on('player:left', (data) => {
+    if (overlayView && !overlayView.isDestroyed()) {
+      overlayView.webContents.send('relay:player-left', data);
+    }
   });
 }
 

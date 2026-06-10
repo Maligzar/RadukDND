@@ -44,6 +44,10 @@ const ALLOWED_RECEIVE = new Set([
   'view:active',
   'session:info',
   'stats:update',
+  'relay:player-joined',
+  'relay:player-left',
+  'relay:connected',
+  'relay:disconnected',
 ]);
 
 contextBridge.exposeInMainWorld('electronAPI', {
