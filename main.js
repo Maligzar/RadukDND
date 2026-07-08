@@ -181,7 +181,9 @@ function createViews(role) {
   });
   mainWindow.addBrowserView(ddbView);
   ddbView.webContents.loadURL('https://www.dndbeyond.com');
-  ddbView.webContents.openDevTools({ mode: 'detach' });
+  if (process.env.NODE_ENV === 'development') {
+    ddbView.webContents.openDevTools({ mode: 'detach' });
+  }
 
   // Roll20 — shared map for all roles
   roll20View = new BrowserView({
@@ -236,7 +238,11 @@ function registerIpcHandlers() {
       });
       activeSession = { id: info.lastInsertRowid, code, role: 'dm' };
     } else {
-      const code = generateSessionCode();
+      // Player joins the DM's existing session — use the entered code, not a new one.
+      if (!sessionCode) {
+        return { ok: false, error: 'Player must provide a session code' };
+      }
+      const code = sessionCode;
       const info = db.insertSession.run({
         session_code: code, dm_name: 'DM',
         started_at: Date.now(), party_level: partyLevel || 1, party_size: partySize || 6,
@@ -281,15 +287,21 @@ function registerIpcHandlers() {
     };
     db.insertRoll.run(roll);
     if (roll.is_secret) return;
+    // DDB broadcasts every party member's roll into the toast stream we capture,
+    // so prefer the roller name parsed from the toast over the local character.
+    // Only claim player_name for the local user's own roll.
+    const capturedName = payload.character_name ?? null;
+    const isLocalRoll  = !capturedName || capturedName === activeSession.characterName;
+    const displayRoll = {
+      ...roll,
+      character_name: capturedName ?? activeSession.characterName ?? null,
+      player_name:    isLocalRoll ? (activeSession.playerName ?? null) : null,
+    };
     if (overlayView) {
-      overlayView.webContents.send('roll:display', {
-        ...roll,
-        character_name: activeSession.characterName ?? null,
-        player_name:    activeSession.playerName    ?? null,
-      });
+      overlayView.webContents.send('roll:display', displayRoll);
     }
-    // Phase 19: Broadcast to relay
-    relayClient.broadcastRoll(roll);
+    // Phase 19: Broadcast to relay (with attribution preserved)
+    relayClient.broadcastRoll(displayRoll);
   });
 
   // ── HP update (DM only) ────────────────────────────────────
@@ -616,6 +628,7 @@ function registerIpcHandlers() {
     overlayView?.webContents.send('hp:update', {
       combatant_name: data.combatant_name,
       hp_current: data.hp_current,
+      hp_max: data.hp_max,
     });
   });
 

@@ -10,11 +10,13 @@ class RelayClient {
     this.connected = false;
     this.sessionCode = null;
     this.role = null;
+    this.dmName = null;
+    this.clientId = `client-${Date.now()}-${Math.random()}`;
     this.listeners = {}; // { eventName: [callbacks...] }
   }
 
   connect() {
-    if (this.socket) return Promise.resolve();
+    if (this.socket && this.connected) return Promise.resolve();
 
     return new Promise((resolve, reject) => {
       try {
@@ -29,6 +31,17 @@ class RelayClient {
         this.socket.on('connect', () => {
           this.connected = true;
           console.log('[Relay] Connected to server');
+
+          // Re-join the room if we were in one before disconnect
+          if (this.sessionCode && this.role) {
+            console.log(`[Relay] Rejoining session ${this.sessionCode} as ${this.role}`);
+            this.socket.emit('session:join', {
+              code: this.sessionCode,
+              role: this.role,
+              dmName: this.dmName || 'DM',
+            });
+          }
+
           this._emit('relay:connected');
           resolve();
         });
@@ -52,14 +65,17 @@ class RelayClient {
 
         // Listen for broadcast events from other clients in the room
         this.socket.on('roll:broadcast', (data) => {
+          if (data.clientId === this.clientId) return; // Skip own echo
           this._emit('roll:broadcast', data);
         });
 
         this.socket.on('hp:update', (data) => {
+          if (data.clientId === this.clientId) return; // Skip own echo
           this._emit('hp:update', data);
         });
 
         this.socket.on('initiative:sync', (data) => {
+          if (data.clientId === this.clientId) return; // Skip own echo
           this._emit('initiative:sync', data);
         });
 
@@ -83,13 +99,15 @@ class RelayClient {
   }
 
   joinSession(code, role, dmName) {
-    if (!this.socket || !this.connected) {
-      console.warn('[Relay] Not connected, cannot join session');
-      return;
-    }
-
     this.sessionCode = code;
     this.role = role;
+    this.dmName = dmName;
+
+    if (!this.socket || !this.connected) {
+      console.warn('[Relay] Not connected, will retry when ready');
+      // Will be auto-emitted on reconnect
+      return;
+    }
 
     console.log(`[Relay] Joining session ${code} as ${role}`);
     this.socket.emit('session:join', {
@@ -114,7 +132,7 @@ class RelayClient {
 
   broadcastRoll(roll) {
     if (!this.socket || !this.sessionCode) return;
-    this.socket.emit('roll:broadcast', { code: this.sessionCode, roll });
+    this.socket.emit('roll:broadcast', { code: this.sessionCode, roll, clientId: this.clientId });
   }
 
   broadcastHpUpdate(combatantName, hpCurrent, hpMax) {
@@ -124,6 +142,7 @@ class RelayClient {
       combatant_name: combatantName,
       hp_current: hpCurrent,
       hp_max: hpMax,
+      clientId: this.clientId,
     });
   }
 
@@ -132,6 +151,7 @@ class RelayClient {
     this.socket.emit('initiative:sync', {
       code: this.sessionCode,
       combatants,
+      clientId: this.clientId,
     });
   }
 
