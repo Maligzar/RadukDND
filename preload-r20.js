@@ -14,11 +14,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.send(channel, data);
     }
   },
-  invoke: (channel, data) => {
-    if (['initiative:get-combatants'].includes(channel)) {
-      return ipcRenderer.invoke(channel, data);
-    }
-  },
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -52,7 +47,8 @@ function monitorTokenHpChanges() {
   // Look for the token layer and stat bubbles
   const tokenLayer = document.getElementById('token-layer');
   if (!tokenLayer) {
-    console.warn('[r20] Token layer not found');
+    console.warn('[r20] Token layer not found; retrying...');
+    setTimeout(monitorTokenHpChanges, 1000);
     return;
   }
 
@@ -200,23 +196,19 @@ function monitorCharacterSheetHp() {
   }
 
   hpInputs.forEach((input) => {
-    const prevValue = input.value;
-
     input.addEventListener('change', () => {
       const newValue = input.value;
-      if (newValue !== prevValue) {
-        const charName = document.querySelector('[data-character-name]')?.getAttribute('data-character-name') ||
-                         'Unknown Character';
+      const charName = document.querySelector('[data-character-name]')?.getAttribute('data-character-name') ||
+                       'Unknown Character';
 
-        console.log(`[r20] Sheet HP change: ${charName} → ${newValue}`);
+      console.log(`[r20] Sheet HP change: ${charName} → ${newValue}`);
 
-        window.electronAPI.send('hp:r20-update', {
-          token_name: charName,
-          hp_current: parseInt(newValue, 10),
-          source: 'character-sheet',
-          timestamp: Date.now(),
-        });
-      }
+      window.electronAPI.send('hp:r20-update', {
+        token_name: charName,
+        hp_current: parseInt(newValue, 10),
+        source: 'character-sheet',
+        timestamp: Date.now(),
+      });
     });
   });
 

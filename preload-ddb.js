@@ -38,6 +38,11 @@ function parseToastText(text) {
   const rolledIdx = t.indexOf('Rolled ');
   const afterRolled = t.slice(rolledIdx + 7);
 
+  // Roller name — the character/player text before "Rolled". DDB broadcasts
+  // every party member's roll into this toast stream, so this is the true
+  // author, not the local user. e.g. "Yaniel Rolled CON: Save 21" → "Yaniel".
+  const character_name = t.slice(0, rolledIdx).trim() || null;
+
   const action_label = afterRolled
     .replace(/\s*=\s*\d+\s*$/, '')
     .replace(/\s+\d+\s*$/, '')
@@ -56,6 +61,7 @@ function parseToastText(text) {
     modifier:     0,
     total,
     action_label,
+    character_name,
     roll_type,
     is_secret,
     is_crit,
@@ -94,7 +100,7 @@ let lastKey      = null;
 let lastKeyTimer = null;
 
 function isDuplicate(roll) {
-  const key = `${roll.total}:${roll.action_label}`;
+  const key = `${roll.character_name}:${roll.total}:${roll.action_label}`;
   if (key === lastKey) return true;
   lastKey = key;
   clearTimeout(lastKeyTimer);
@@ -174,7 +180,10 @@ function startObserver() {
 
   setTimeout(() => {
     const info = extractCharacterInfo();
-    if (info.name || info.url) {
+    // Only report when we're actually on a character sheet — window.location.href
+    // is always set, so guard on the character-page URL pattern (or a parsed name).
+    const isCharacterPage = /\/characters\/\d+/i.test(window.location.href);
+    if (isCharacterPage || info.name) {
       console.log('[DDB Preload] Character info:', info);
       ipcRenderer.send('ddb:character-info', info);
     }

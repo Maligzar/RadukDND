@@ -62,6 +62,11 @@ const ALLOWED_RECEIVE = new Set([
   'stats:update',
   // Phase 17: character switching
   'ddb:character-info',
+  // Phase 19: relay multiplayer events
+  'relay:player-joined',
+  'relay:player-left',
+  'relay:connected',
+  'relay:disconnected',
 ]);
 
 contextBridge.exposeInMainWorld('electronAPI', {

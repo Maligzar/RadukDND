@@ -355,6 +355,7 @@
 
   // ── State ───────────────────────────────────────────────────
   let rollCount = 0;
+  let initiativeList = [];
 
   // ── Timestamp formatter (Phase 9) ───────────────────────────
   function formatTime(unixMs) {
@@ -433,6 +434,7 @@
 
   // ── Render initiative list ───────────────────────────────────
   function renderInitiative(list) {
+    initiativeList = Array.isArray(list) ? list : [];
     const container = document.getElementById('init-list');
     const empty     = document.getElementById('init-empty');
 
@@ -578,8 +580,12 @@
     renderInitiative(list);
   });
 
-  api.on('hp:update', () => {
-    loadInitiative();
+  api.on('hp:update', ({ combatant_name, hp_current, hp_max }) => {
+    renderInitiative(initiativeList.map(c =>
+      c.combatant_name === combatant_name
+        ? { ...c, hp_current, hp_max: hp_max ?? c.hp_max }
+        : c
+    ));
   });
 
   // ── Boot ─────────────────────────────────────────────────────

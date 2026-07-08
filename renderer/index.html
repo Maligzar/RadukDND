@@ -403,6 +403,19 @@
                oninput="validate()">
       </div>
 
+      <!-- Party config (drives encounter difficulty; DM-facing) -->
+      <div class="field-group" id="party-config-group">
+        <label class="field-label">Party level &amp; size</label>
+        <div style="display:flex; gap:12px;">
+          <input class="field-input" id="party-level" type="number"
+                 min="1" max="20" value="4" style="flex:1"
+                 title="Average party level">
+          <input class="field-input" id="party-size" type="number"
+                 min="1" max="8" value="4" style="flex:1"
+                 title="Number of players">
+        </div>
+      </div>
+
       <!-- Session code (hidden until Phase 11 relay is live) -->
       <div class="field-group" id="session-code-group" style="display:none">
         <label class="field-label" for="session-code">Session code</label>
@@ -499,13 +512,15 @@
         : 'Joining the adventuring party...';
 
     try {
+      const partyLevel = parseInt(document.getElementById('party-level').value || 4, 10);
+      const partySize  = parseInt(document.getElementById('party-size').value || 4, 10);
       const result = await window.electronAPI.invoke('session:set-role', {
         role:          selectedRole,
         characterName: charName,
         playerName:    playerName,
         sessionCode:   sessionCode,
-        partyLevel:    1,
-        partySize:     6,
+        partyLevel:    partyLevel,
+        partySize:     partySize,
       });
 
       if (!result?.ok) throw new Error('Session creation failed');
