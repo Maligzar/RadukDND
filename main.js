@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, BrowserWindow, BrowserView, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, BrowserView, ipcMain, shell, session } = require('electron');
 const path = require('path');
 const { openCampaignDb, openBestiaryDb, getStatements } = require('./db/db-init');
 const relayClient = require('./relay-client');
@@ -34,6 +34,11 @@ const CARD_BROWSER_W = 80; // Phase 13: collapsible card browser (left sidebar)
 // App ready
 // ─────────────────────────────────────────────────────────────
 app.whenReady().then(async () => {
+  // Roll20/DDB embed third-party WebRTC (voice chat, etc.) that otherwise gathers
+  // ICE candidates via public STUN servers — pointless here and a potential IP leak
+  // from untrusted embedded content, so restrict to proxied/local candidates only.
+  session.defaultSession.setWebRTCIPHandlingPolicy('disable_non_proxied_udp');
+
   campaignDb = openCampaignDb(app);
   bestiaryDb = openBestiaryDb();
   db         = getStatements(campaignDb);
