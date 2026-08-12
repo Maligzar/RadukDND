@@ -143,7 +143,7 @@
   .rm-btn:hover { color: #cc2a2a; }
   .init-empty {
     padding: 12px; text-align: center; font-family: 'Cinzel', serif;
-    font-size: 10px; color: #4a3820; letter-spacing: 0.08em; text-transform: uppercase;
+    font-size: 10px; color: #8a7250; letter-spacing: 0.08em; text-transform: uppercase;
   }
 
   /* Action bar */
@@ -206,14 +206,14 @@
   .stat-val.green { color: #2a9a2a; }
   .stat-key {
     font-family: 'Cinzel', serif; font-size: 8px;
-    color: #705a3a; letter-spacing: 0.1em; text-transform: uppercase; margin-top: 1px;
+    color: #a08a68; letter-spacing: 0.1em; text-transform: uppercase; margin-top: 1px;
   }
   .dist-row {
     display: grid; grid-template-columns: 32px 1fr 20px;
     align-items: center; gap: 5px; padding: 3px 8px;
     border-bottom: 1px solid rgba(74,60,40,0.15);
   }
-  .dist-label { font-family: 'Cinzel', serif; font-size: 9px; color: #705a3a; text-align: right; }
+  .dist-label { font-family: 'Cinzel', serif; font-size: 9px; color: #a08a68; text-align: right; }
   .dist-track { height: 6px; background: #1e1916; border: 1px solid rgba(74,60,40,0.4); border-radius: 1px; overflow: hidden; }
   .dist-fill { height: 100%; border-radius: 1px; transition: width 0.4s ease; }
   .dist-fill.low  { background: #8c1a1a; }
@@ -221,10 +221,10 @@
   .dist-fill.good { background: #3a7a3a; }
   .dist-fill.high { background: #c8922a; }
   .dist-fill.crit { background: #ffd100; }
-  .dist-count { font-family: 'Cinzel', serif; font-size: 9px; color: #705a3a; text-align: right; }
+  .dist-count { font-family: 'Cinzel', serif; font-size: 9px; color: #a08a68; text-align: right; }
   .stats-empty {
     padding: 10px; text-align: center; font-family: 'Cinzel', serif;
-    font-size: 10px; color: #3a2e1e; letter-spacing: 0.08em; text-transform: uppercase;
+    font-size: 10px; color: #8a7250; letter-spacing: 0.08em; text-transform: uppercase;
   }
   .stats-toggle {
     background: none; border: none; color: #705a3a;
@@ -535,11 +535,11 @@ window.addEventListener('DOMContentLoaded', () => {
           <div class="stat-key">Average</div>
         </div>
         <div class="stat-cell">
-          <div class="stat-val gold">${s.total_crits} <span style="font-size:10px;color:#705a3a">${s.crit_pct}%</span></div>
+          <div class="stat-val gold">${s.total_crits} <span style="font-size:10px;color:#a08a68">${s.crit_pct}%</span></div>
           <div class="stat-key">Crits</div>
         </div>
         <div class="stat-cell">
-          <div class="stat-val red">${s.total_nat1s} <span style="font-size:10px;color:#705a3a">${s.nat1_pct}%</span></div>
+          <div class="stat-val red">${s.total_nat1s} <span style="font-size:10px;color:#a08a68">${s.nat1_pct}%</span></div>
           <div class="stat-key">Nat 1s</div>
         </div>
         <div class="stat-cell">
